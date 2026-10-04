@@ -282,6 +282,30 @@ streaming-recommendation-engine/
 
 No API keys and no paid services are needed to run this project.
 
+## Sample results
+
+Meera and Thomas have watch histories built from the 20 highest rated
+movies in their preferred genres (Comedy and Romance, Drama and
+Documentary) that have at least 50 ratings, six of them picked at
+random. Arjun's history is built from title keywords like "fast" and
+"drive". These are the top results from one run, and every percentage is
+produced by the mock scorer, not a trained model.
+
+| Persona | Top result | Match | Titles above the 72% badge threshold (top 15) |
+|---|---|---|---|
+| Arjun | Fight Club (1999) | no badge | 0 |
+| Meera | Toy Story (1995) | 78.0% | 8 |
+| Thomas | Pulp Fiction (1994) | 74.5% | 1 |
+
+Meera's next picks are Best Men (76.9%) and What Happened Was... (76.0%).
+
+Known weak spots, so nobody reads more into this than is there. Many of
+Arjun's recommendations carry the reason "similar genre, Comedy, Drama,
+Romance", which does not look like a car and racing fan, because his
+keyword matches pull in loosely related titles. Thomas's list leans
+toward Action and Crime genres even though he prefers Drama and
+Documentary. Both would need more work in stage one.
+
 ## Data credit
 
 Movie data, F. Maxwell Harper and Joseph A. Konstan. 2015. The
