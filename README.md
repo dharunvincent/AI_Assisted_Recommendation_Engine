@@ -1,5 +1,8 @@
 # Streaming Platform Content Recommendation Engine
 
+![Python 3](https://img.shields.io/badge/python-3-blue.svg)
+![Stage 2 scoring: mock](https://img.shields.io/badge/JEV%20scoring-mock-orange.svg)
+
 A two stage recommendation engine, built the same way a real streaming
 platform would approach the problem. Stage one narrows a huge catalog
 down to a short list of good candidates using traditional methods. Stage
