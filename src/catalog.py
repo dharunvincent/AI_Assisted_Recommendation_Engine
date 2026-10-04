@@ -70,13 +70,9 @@ def load_catalog():
             movie["avg_rating"] = round(movie["rating_sum"] / movie["rating_count"], 2)
         else:
             movie["avg_rating"] = None
+        # rating_sum was only ever a working total used to compute
+        # avg_rating above, nothing downstream needs it, so drop it
+        # instead of leaving a half used field sitting in every record.
+        del movie["rating_sum"]
 
     return catalog
-
-
-def genre_set(catalog):
-    """Returns the full set of genres present in the catalog."""
-    all_genres = set()
-    for movie in catalog.values():
-        all_genres.update(movie["genres"])
-    return all_genres

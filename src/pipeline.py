@@ -37,6 +37,7 @@ from src.stage1_candidate_generation import (
     diversity,
 )
 from src.stage1_candidate_generation.merge_shortlist import merge
+from config.weights import STAGE1_SHORTLIST_MIN_SIZE
 
 
 def run_stage1(user, catalog, context):
@@ -59,7 +60,19 @@ def run_stage1(user, catalog, context):
     with ThreadPoolExecutor(max_workers=8) as pool:
         results = list(pool.map(lambda job: job(), jobs))
 
-    return merge(results)
+    shortlist = merge(results)
+
+    # If the eight generators together could not even reach the minimum
+    # shortlist size, that is worth knowing about, it usually means this
+    # user has too little history or too small a catalog for stage one
+    # to do its job properly, not something stage two can fix.
+    if len(shortlist) < STAGE1_SHORTLIST_MIN_SIZE:
+        print(
+            f"  note: stage 1 only produced {len(shortlist)} candidates for "
+            f"{user['name']}, below the target minimum of {STAGE1_SHORTLIST_MIN_SIZE}."
+        )
+
+    return shortlist
 
 
 def build_dislike_scores(user, catalog):
@@ -109,10 +122,26 @@ def run_pipeline_for_user(user, catalog, context):
 
 def print_results(user, ranked):
     print(f"\n=== Recommendations for {user['name']} ({user['user_id']}) ===")
+    print(f"Persona taste: {user['taste_summary']}")
+
     for item in ranked[:15]:
         badge = f"{item['final_score']}% match" if item["show_badge"] else "no badge, below 72%"
         override_note = " [dislike override used]" if item["dislike_override_used"] else ""
-        print(f"- {item['title']} ({item['year']}) | {badge}{override_note}")
+        top_reason = item["reasons"][0]
+        print(f"- {item['title']} ({item['year']}) | {badge}{override_note} | {top_reason}")
+
+    # Show the full score breakdown for the single top pick, this is the
+    # number that explains itself when you are showing this project to
+    # someone, why did this one title come out on top.
+    if ranked:
+        top_pick = ranked[0]
+        answers = top_pick["jev_answers"]
+        print(
+            f"  why '{top_pick['title']}' is on top: "
+            f"taste fit {answers['taste_fit']['answer']}, "
+            f"completion likelihood {answers['completion_likelihood']['answer']}, "
+            f"context fit {answers['context_fit']['answer']}"
+        )
 
 
 def main():
@@ -127,7 +156,6 @@ def main():
     context = {
         "time_of_day": "evening",
         "day_of_week": "Friday",
-        "device": "tv",
     }
 
     for user in users:

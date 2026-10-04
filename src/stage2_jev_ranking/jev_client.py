@@ -79,6 +79,7 @@ def ask(state, questions):
         if question.question_type == "score":
             answer = max(0.0, min(1.0, question.bias_hint + wobble))
             answers[key] = {
+                "question": question.question_text,
                 "answer": round(answer, 3),
                 "confidence": round(0.6 + pseudo_random_value * 0.35, 3),
             }
@@ -90,6 +91,7 @@ def ask(state, questions):
             else:
                 chosen_index = int(pseudo_random_value * len(question.options)) % len(question.options)
             answers[key] = {
+                "question": question.question_text,
                 "answer": question.options[chosen_index],
                 "confidence": round(0.6 + pseudo_random_value * 0.35, 3),
             }

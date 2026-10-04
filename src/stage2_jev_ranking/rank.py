@@ -101,6 +101,7 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
             "year": movie["year"],
             "genres": movie["genres"],
             "sources": candidate["sources"],
+            "reasons": candidate["reasons"],
             "final_score": final_score,
             "show_badge": final_score >= BADGE_DISPLAY_THRESHOLD_PERCENT,
             "dislike_override_used": override_used,

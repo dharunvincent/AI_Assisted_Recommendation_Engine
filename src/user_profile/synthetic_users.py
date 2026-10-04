@@ -65,6 +65,7 @@ def build_persona_user(persona, catalog, random_seed=None):
         "user_id": persona["user_id"],
         "name": persona["name"],
         "age_group": persona["age_group"],
+        "taste_summary": persona["taste_summary"],
         "watch_history": [],
         "hard_blocked_movie_ids": [],
         "current_session": [],
