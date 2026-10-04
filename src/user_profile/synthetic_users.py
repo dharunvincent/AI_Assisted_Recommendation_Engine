@@ -14,6 +14,7 @@ exact scenario the dislike override logic in stage 2 is built to handle.
 """
 
 import random
+import re
 from datetime import datetime, timedelta
 
 
@@ -23,6 +24,7 @@ PERSONAS = [
         "name": "Arjun",
         "age_group": "25 to 34",
         "taste_summary": "loves car and racing action movies, dislikes animated movies even when the subject is cars",
+        "preferred_genres": ["Action"],
     },
     {
         "user_id": "persona_02",
@@ -51,7 +53,8 @@ CAR_RELATED_KEYWORDS = ["fast", "furious", "speed", "cars", "drive", "racing", "
 
 def _find_movies_by_keyword(catalog, keyword):
     keyword_lower = keyword.lower()
-    return [movie for movie in catalog.values() if keyword_lower in movie["title"].lower()]
+    pattern = re.compile(r"\b" + re.escape(keyword_lower) + r"\b")
+    return [movie for movie in catalog.values() if pattern.search(movie["title"].lower())]
 
 
 def _find_top_movies_by_genre(catalog, genres, limit=20, min_ratings=MIN_RATING_COUNT):
@@ -86,6 +89,7 @@ def build_persona_user(persona, catalog, random_seed=None):
     user = {
         "user_id": persona["user_id"],
         "name": persona["name"],
+        "preferred_genres": persona["preferred_genres"],
         "age_group": persona["age_group"],
         "taste_summary": persona["taste_summary"],
         "watch_history": [],
@@ -95,9 +99,15 @@ def build_persona_user(persona, catalog, random_seed=None):
 
     if persona["user_id"] == "persona_01":
         # Build the car and racing lover persona described above.
-        liked_titles = []
+        # Whole word keyword matches only count if the movie is a live
+        # action Action title, otherwise "fast" pulls in Fast Times at
+        # Ridgemont High and similar.
+        liked_titles = {}
         for keyword in CAR_RELATED_KEYWORDS:
-            liked_titles.extend(_find_movies_by_keyword(catalog, keyword))
+            for movie in _find_movies_by_keyword(catalog, keyword):
+                if "Action" in movie["genres"] and "Animation" not in movie["genres"]:
+                    liked_titles[movie["movie_id"]] = movie
+        liked_titles = list(liked_titles.values())
 
         for movie in liked_titles[:6]:
             user["watch_history"].append({

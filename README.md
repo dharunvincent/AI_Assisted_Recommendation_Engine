@@ -293,18 +293,21 @@ produced by the mock scorer, not a trained model.
 
 | Persona | Top result | Match | Titles above the 72% badge threshold (top 15) |
 |---|---|---|---|
-| Arjun | Fight Club (1999) | no badge | 0 |
+| Arjun | Heat (1995) | 74.5% | 1 |
 | Meera | Toy Story (1995) | 78.0% | 8 |
 | Thomas | Pulp Fiction (1994) | 74.5% | 1 |
 
 Meera's next picks are Best Men (76.9%) and What Happened Was... (76.0%).
 
-Known weak spots, so nobody reads more into this than is there. Many of
-Arjun's recommendations carry the reason "similar genre, Comedy, Drama,
-Romance", which does not look like a car and racing fan, because his
-keyword matches pull in loosely related titles. Thomas's list leans
-toward Action and Crime genres even though he prefers Drama and
-Documentary. Both would need more work in stage one.
+Genre fixes in stage one: Arjun's keyword matches are now whole word
+and limited to live action Action titles (so "Fast Times at Ridgemont
+High" no longer counts as a car movie), and the content based generator
+uses a persona's declared `preferred_genres` instead of genres inferred
+from history, which Action and Crime dramas used to skew. The reasons
+shown for Arjun now say "Action" and Thomas's genre based picks say
+"Documentary, Drama". Many items in both lists still come from the
+trending, popularity and collaborative generators, which do not look at
+genre, so some off taste titles remain.
 
 ## Data credit
 

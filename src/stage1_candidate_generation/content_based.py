@@ -33,7 +33,12 @@ def generate(user, catalog, max_candidates=15):
     if not genre_counter:
         return []  # nothing to go on yet, cold start, another generator has to cover this user
 
-    favourite_genres = {genre for genre, _ in genre_counter.most_common(3)}
+    # A user's declared preferred genres win over genres inferred from
+    # history, since crime and action titles often carry a Drama tag
+    # too and would otherwise drown out what the user actually asked for.
+    favourite_genres = set(user.get("preferred_genres") or [])
+    if not favourite_genres:
+        favourite_genres = {genre for genre, _ in genre_counter.most_common(3)}
 
     candidates = []
     for movie in catalog.values():
