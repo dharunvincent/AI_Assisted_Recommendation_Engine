@@ -29,12 +29,16 @@ PERSONAS = [
         "name": "Meera",
         "age_group": "18 to 24",
         "taste_summary": "loves comedy and romance, mostly light background watching",
+        "preferred_genres": ["Comedy", "Romance"],
+        "completion_range": (0.55, 0.9),
     },
     {
         "user_id": "persona_03",
         "name": "Thomas",
         "age_group": "45 plus",
         "taste_summary": "prefers drama and documentary, finishes almost everything they start",
+        "preferred_genres": ["Drama", "Documentary"],
+        "completion_range": (0.85, 1.0),
     },
 ]
 
@@ -44,6 +48,20 @@ CAR_RELATED_KEYWORDS = ["fast", "furious", "speed", "cars", "drive", "racing", "
 def _find_movies_by_keyword(catalog, keyword):
     keyword_lower = keyword.lower()
     return [movie for movie in catalog.values() if keyword_lower in movie["title"].lower()]
+
+
+def _find_top_movies_by_genre(catalog, genres, limit=20):
+    """
+    Returns the highest average rated catalog movies that have at least
+    one of the given genres.
+    """
+    wanted = set(genres)
+    matches = [
+        movie for movie in catalog.values()
+        if movie["avg_rating"] is not None and wanted.intersection(movie["genres"])
+    ]
+    matches.sort(key=lambda movie: movie["avg_rating"], reverse=True)
+    return matches[:limit]
 
 
 def _random_timestamp_within_last_days(days):
@@ -100,14 +118,14 @@ def build_persona_user(persona, catalog, random_seed=None):
             })
 
     else:
-        # Simpler random sample based build for the other two personas,
-        # good enough to exercise the rest of the pipeline.
-        sample_pool = [m for m in catalog.values() if m["avg_rating"] is not None]
-        sample_size = min(6, len(sample_pool))
-        for movie in random.sample(sample_pool, sample_size):
+        # Genre matched build for the other personas, a random sample
+        # of the best rated movies in their preferred genres.
+        top_matches = _find_top_movies_by_genre(catalog, persona["preferred_genres"])
+        low, high = persona["completion_range"]
+        for movie in random.sample(top_matches, min(6, len(top_matches))):
             user["watch_history"].append({
                 "movie_id": movie["movie_id"],
-                "completion_pct": round(random.uniform(0.3, 1.0), 2),
+                "completion_pct": round(random.uniform(low, high), 2),
                 "timestamp": _random_timestamp_within_last_days(180),
             })
 
