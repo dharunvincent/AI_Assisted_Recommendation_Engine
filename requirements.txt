@@ -1,0 +1,4 @@
+# This project is written almost entirely using Python's own standard
+# library on purpose, so anyone cloning it has very little to install.
+# pytest is only needed if you want to run the test file in tests/
+pytest>=7.0.0
