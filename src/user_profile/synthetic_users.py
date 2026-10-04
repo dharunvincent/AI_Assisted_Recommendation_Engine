@@ -42,6 +42,10 @@ PERSONAS = [
     },
 ]
 
+# Ignore movies with fewer ratings than this when ranking by average
+# rating, otherwise a title with one 5.0 rating beats a well known film.
+MIN_RATING_COUNT = 50
+
 CAR_RELATED_KEYWORDS = ["fast", "furious", "speed", "cars", "drive", "racing", "italian job"]
 
 
@@ -50,15 +54,15 @@ def _find_movies_by_keyword(catalog, keyword):
     return [movie for movie in catalog.values() if keyword_lower in movie["title"].lower()]
 
 
-def _find_top_movies_by_genre(catalog, genres, limit=20):
+def _find_top_movies_by_genre(catalog, genres, limit=20, min_ratings=MIN_RATING_COUNT):
     """
     Returns the highest average rated catalog movies that have at least
-    one of the given genres.
+    one of the given genres and at least min_ratings ratings.
     """
     wanted = set(genres)
     matches = [
         movie for movie in catalog.values()
-        if movie["avg_rating"] is not None and wanted.intersection(movie["genres"])
+        if movie["rating_count"] >= min_ratings and wanted.intersection(movie["genres"])
     ]
     matches.sort(key=lambda movie: movie["avg_rating"], reverse=True)
     return matches[:limit]
