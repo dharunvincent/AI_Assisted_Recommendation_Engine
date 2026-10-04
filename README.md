@@ -78,10 +78,13 @@ into one final score out of 100 for each title.
 
 Each generator lives in its own file inside `src/stage1_candidate_generation/`
 
-1. **Content based filtering** (`content_based.py`) Looks at the genres
-   of titles the user has already watched and liked, and finds other
-   titles sharing those genres. Works well once a user has some history,
-   struggles for a brand new user.
+1. **Content based filtering** (`content_based.py`) Checks the user's
+   explicitly declared `preferred_genres` first when they exist, like
+   from an onboarding quiz. Only when that is not set does it infer
+   favourite genres from the titles the user has already watched and
+   liked. Either way it finds other titles sharing those genres. Works
+   well once a user has some history or declared taste, struggles for a
+   brand new user with neither.
 
 2. **Collaborative filtering** (`collaborative.py`) Uses the real
    MovieLens ratings from hundreds of real anonymous people to find
