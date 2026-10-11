@@ -100,6 +100,7 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
             "title": movie["title"],
             "year": movie["year"],
             "genres": movie["genres"],
+            "avg_rating": movie["avg_rating"],
             "sources": candidate["sources"],
             "reasons": candidate["reasons"],
             "final_score": final_score,
