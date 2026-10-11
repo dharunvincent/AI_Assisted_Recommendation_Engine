@@ -18,8 +18,12 @@ Three kinds of removal happen here:
    who says "I never watch anything rated below 6 out of 10" is asking
    for a rule, not a lean, so this is a hard removal too. Titles with no
    rating at all are removed as well, since there is no way to show they
-   clear the floor.
+   clear the floor. So are titles with fewer than
+   MIN_RATINGS_FOR_QUALITY_FLOOR ratings, because a high average from only
+   a few raters is not trustworthy.
 """
+
+from config.weights import MIN_RATINGS_FOR_QUALITY_FLOOR
 
 
 def exclude(shortlist, user, catalog):
@@ -31,7 +35,12 @@ def exclude(shortlist, user, catalog):
         if min_avg_rating is None:
             return False
         movie = catalog.get(movie_id)
-        return movie is None or movie["avg_rating"] is None or movie["avg_rating"] < min_avg_rating
+        return (
+            movie is None
+            or movie["avg_rating"] is None
+            or movie["rating_count"] < MIN_RATINGS_FOR_QUALITY_FLOOR
+            or movie["avg_rating"] < min_avg_rating
+        )
 
     filtered = [
         candidate for candidate in shortlist

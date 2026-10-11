@@ -68,3 +68,12 @@ SIGNAL_HALF_LIFE_DAYS = 60
 # -----------------------------------------------------------------------
 STAGE1_SHORTLIST_MIN_SIZE = 30
 STAGE1_SHORTLIST_MAX_SIZE = 50
+
+# -----------------------------------------------------------------------
+# QUALITY FLOOR MINIMUM RATINGS
+# A title only passes a user's quality floor if at least this many people
+# rated it. A high average from only a few raters is not trustworthy, for
+# example one title with two perfect ratings would otherwise beat a title
+# with thousands of ratings averaging slightly lower.
+# -----------------------------------------------------------------------
+MIN_RATINGS_FOR_QUALITY_FLOOR = 20
