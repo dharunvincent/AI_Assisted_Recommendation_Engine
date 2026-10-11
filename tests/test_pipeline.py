@@ -17,7 +17,7 @@ from src.user_profile.taste_score import decay_factor, update_dislike_score
 from src.stage1_candidate_generation.merge_shortlist import merge
 from src.exclusion_filter.exclude import exclude
 from src.pipeline import build_dislike_scores
-from config.weights import SIGNAL_HALF_LIFE_DAYS
+from config.weights import MIN_RATINGS_FOR_QUALITY_FLOOR, SIGNAL_HALF_LIFE_DAYS
 
 
 class TestDecayFormula(unittest.TestCase):
@@ -55,10 +55,10 @@ class TestMergeShortlist(unittest.TestCase):
 class TestQualityFloor(unittest.TestCase):
     def setUp(self):
         self.catalog = {
-            1: {"avg_rating": 4.2},
-            2: {"avg_rating": 2.4},
-            3: {"avg_rating": None},
-            4: {"avg_rating": 3.0},
+            1: {"avg_rating": 4.2, "rating_count": 100},
+            2: {"avg_rating": 2.4, "rating_count": 100},
+            3: {"avg_rating": None, "rating_count": 0},
+            4: {"avg_rating": 3.0, "rating_count": 100},
         }
         self.shortlist = [{"movie_id": movie_id} for movie_id in self.catalog]
 
@@ -66,6 +66,17 @@ class TestQualityFloor(unittest.TestCase):
         user = {"watch_history": [], "min_avg_rating": 3.0}
         kept = [c["movie_id"] for c in exclude(self.shortlist, user, self.catalog)]
         self.assertEqual(kept, [1, 4])  # exactly at the floor is allowed
+
+    def test_floor_removes_titles_with_too_few_ratings(self):
+        # A perfect average from only two raters is not trustworthy.
+        catalog = {
+            1: {"avg_rating": 5.0, "rating_count": 2},
+            2: {"avg_rating": 4.0, "rating_count": MIN_RATINGS_FOR_QUALITY_FLOOR},
+        }
+        shortlist = [{"movie_id": movie_id} for movie_id in catalog]
+        user = {"watch_history": [], "min_avg_rating": 3.0}
+        kept = [c["movie_id"] for c in exclude(shortlist, user, catalog)]
+        self.assertEqual(kept, [2])  # exactly at the minimum count is allowed
 
     def test_no_floor_keeps_everything(self):
         user = {"watch_history": []}
