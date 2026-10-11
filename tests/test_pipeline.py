@@ -15,6 +15,8 @@ from datetime import datetime, timedelta
 
 from src.user_profile.taste_score import decay_factor, update_dislike_score
 from src.stage1_candidate_generation.merge_shortlist import merge
+from src.exclusion_filter.exclude import exclude
+from src.pipeline import build_dislike_scores
 from config.weights import SIGNAL_HALF_LIFE_DAYS
 
 
@@ -48,6 +50,36 @@ class TestMergeShortlist(unittest.TestCase):
         self.assertEqual(len(merged), 1)
         self.assertIn("content_based", merged[0]["sources"])
         self.assertIn("trending", merged[0]["sources"])
+
+
+class TestQualityFloor(unittest.TestCase):
+    def setUp(self):
+        self.catalog = {
+            1: {"avg_rating": 4.2},
+            2: {"avg_rating": 2.4},
+            3: {"avg_rating": None},
+            4: {"avg_rating": 3.0},
+        }
+        self.shortlist = [{"movie_id": movie_id} for movie_id in self.catalog]
+
+    def test_floor_removes_low_rated_and_unrated_titles(self):
+        user = {"watch_history": [], "min_avg_rating": 3.0}
+        kept = [c["movie_id"] for c in exclude(self.shortlist, user, self.catalog)]
+        self.assertEqual(kept, [1, 4])  # exactly at the floor is allowed
+
+    def test_no_floor_keeps_everything(self):
+        user = {"watch_history": []}
+        self.assertEqual(len(exclude(self.shortlist, user, self.catalog)), 4)
+
+
+class TestExplicitGenreDislike(unittest.TestCase):
+    def test_disliked_genre_gets_a_full_strength_score(self):
+        user = {"watch_history": [], "disliked_genres": ["Animation"]}
+        scores = build_dislike_scores(user, catalog={})
+        self.assertAlmostEqual(scores["Animation"], 1.0, places=3)
+
+    def test_no_disliked_genres_means_no_scores(self):
+        self.assertEqual(build_dislike_scores({"watch_history": []}, catalog={}), {})
 
 
 if __name__ == "__main__":

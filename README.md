@@ -277,7 +277,8 @@ AI_Assisted_Recommendation_Engine/
    python -m src.pipeline
    ```
    This prints a ranked, scored recommendation list for each of the
-   three synthetic personas.
+   four synthetic personas. To run just one, add `--persona` and a
+   first name, for example `python -m src.pipeline --persona dharun`.
 4. Optional, run the smoke tests:
    ```
    python -m unittest tests.test_pipeline
@@ -311,6 +312,35 @@ shown for Arjun now say "Action" and Thomas's genre based picks say
 "Documentary, Drama". Many items in both lists still come from the
 trending, popularity and collaborative generators, which do not look at
 genre, so some off taste titles remain.
+
+## The Dharun persona, a profile with two rules
+
+The fourth persona is built on the author's own taste. He likes action,
+thriller, documentary and comedy, dislikes animation, and avoids
+anything rated low. His watch history takes two top rated titles from
+each liked genre, so all four genres show up in it. The two dislikes
+work in two different ways on purpose:
+
+1. **Animation is a soft dislike.** It counts as an explicit thumbs down
+   on the whole genre, so every animated title takes a heavy penalty in
+   stage 2, and the override question can still lift it for one
+   standout title. This is the same mechanism as the car movies versus
+   animated movies story above.
+2. **The rating floor is a hard rule.** A user who says they never
+   watch anything rated below 6 out of 10 is not leaning, they are
+   asking for a filter. So the exclusion filter removes those titles
+   before stage 2 ever sees them, along with titles that have no rating.
+
+Two honest limits. MovieLens rates out of 5 and has no IMDb scores, so
+6 out of 10 is stood in for by 3.0 out of 5. And MovieLens only has
+movies, not shows. Run it with:
+
+```
+python -m src.pipeline --persona dharun
+```
+
+The output shows each title's average rating, and ends with a dislike
+check that counts how many animated titles reached the top 15.
 
 ## Data credit
 

@@ -42,6 +42,29 @@ PERSONAS = [
         "preferred_genres": ["Drama", "Documentary"],
         "completion_range": (0.85, 1.0),
     },
+    {
+        "user_id": "persona_04",
+        "name": "Dharun",
+        # Left unset on purpose, the demographic generator skips a user
+        # whose age group it does not know. Fill this in with one of the
+        # age groups listed in demographic.py to switch that generator on.
+        "age_group": "not set",
+        "taste_summary": (
+            "likes action, thriller, documentary and comedy, dislikes animation, "
+            "avoids anything rated below 6 out of 10"
+        ),
+        "preferred_genres": ["Action", "Thriller", "Documentary", "Comedy"],
+        "completion_range": (0.8, 1.0),
+        # Two titles per liked genre, so every liked genre shows up in the
+        # watch history, not just whichever genre has the most top rated titles.
+        "titles_per_genre": 2,
+        # Stated up front, like a thumbs down on a whole genre. It becomes a
+        # soft penalty in stage 2, not a hard block, same as every other dislike.
+        "disliked_genres": ["Animation"],
+        # A quality floor. MovieLens rates out of 5, so 6 out of 10 on IMDb
+        # becomes 3.0 here. MovieLens has no IMDb scores, this is a stand in.
+        "min_avg_rating": 3.0,
+    },
 ]
 
 # Ignore movies with fewer ratings than this when ranking by average
@@ -57,15 +80,19 @@ def _find_movies_by_keyword(catalog, keyword):
     return [movie for movie in catalog.values() if pattern.search(movie["title"].lower())]
 
 
-def _find_top_movies_by_genre(catalog, genres, limit=20, min_ratings=MIN_RATING_COUNT):
+def _find_top_movies_by_genre(catalog, genres, limit=20, min_ratings=MIN_RATING_COUNT, excluded_genres=()):
     """
     Returns the highest average rated catalog movies that have at least
-    one of the given genres and at least min_ratings ratings.
+    one of the given genres and at least min_ratings ratings. Movies
+    carrying any of the excluded genres are left out.
     """
     wanted = set(genres)
+    unwanted = set(excluded_genres)
     matches = [
         movie for movie in catalog.values()
-        if movie["rating_count"] >= min_ratings and wanted.intersection(movie["genres"])
+        if movie["rating_count"] >= min_ratings
+        and wanted.intersection(movie["genres"])
+        and not unwanted.intersection(movie["genres"])
     ]
     matches.sort(key=lambda movie: movie["avg_rating"], reverse=True)
     return matches[:limit]
@@ -90,6 +117,8 @@ def build_persona_user(persona, catalog, random_seed=None):
         "user_id": persona["user_id"],
         "name": persona["name"],
         "preferred_genres": persona["preferred_genres"],
+        "disliked_genres": persona.get("disliked_genres", []),
+        "min_avg_rating": persona.get("min_avg_rating"),
         "age_group": persona["age_group"],
         "taste_summary": persona["taste_summary"],
         "watch_history": [],
@@ -134,9 +163,23 @@ def build_persona_user(persona, catalog, random_seed=None):
     else:
         # Genre matched build for the other personas, a random sample
         # of the best rated movies in their preferred genres.
-        top_matches = _find_top_movies_by_genre(catalog, persona["preferred_genres"])
+        disliked = persona.get("disliked_genres", [])
+        if persona.get("titles_per_genre"):
+            # Pick a few titles from each liked genre separately.
+            picked = {}
+            for genre in persona["preferred_genres"]:
+                pool = _find_top_movies_by_genre(catalog, [genre], excluded_genres=disliked)
+                for movie in random.sample(pool, min(persona["titles_per_genre"], len(pool))):
+                    picked[movie["movie_id"]] = movie
+            chosen = list(picked.values())
+        else:
+            top_matches = _find_top_movies_by_genre(
+                catalog, persona["preferred_genres"], excluded_genres=disliked
+            )
+            chosen = random.sample(top_matches, min(6, len(top_matches)))
+
         low, high = persona["completion_range"]
-        for movie in random.sample(top_matches, min(6, len(top_matches))):
+        for movie in chosen:
             user["watch_history"].append({
                 "movie_id": movie["movie_id"],
                 "completion_pct": round(random.uniform(low, high), 2),
