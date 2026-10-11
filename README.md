@@ -355,6 +355,34 @@ python -m src.pipeline --persona dharun
 The output shows each title's average rating, and ends with a dislike
 check that counts how many animated titles reached the top 15.
 
+## Known limits of this version
+
+- **The scoring is mocked.** JEV is a mock, so every match percentage
+  is simulated, not measured.
+- **No IMDb scores.** MovieLens has no IMDb ratings. The Dharun persona
+  uses a MovieLens average of 3.0 out of 5 as a stand in for IMDb 6 out
+  of 10. Titles with fewer than 20 ratings are removed by this rule,
+  because a high average from only a few raters cannot be trusted.
+- **Movies only.** MovieLens has no TV shows.
+- **Popularity bias.** Titles in the results mostly come from 1993 to
+  2003. The small dataset is dominated by older, heavily rated movies.
+- **Niche genres rarely reach the top 15.** Stage 2 rewards titles that
+  match several of the user's genres. This is a deliberate choice. So
+  single genre titles, such as documentaries, reach the shortlist but
+  rarely reach the top 15. Only 5 of the 440 documentaries have enough
+  ratings to pass the 20 rating rule.
+- **A fix that was tried and reverted.** Scoring genre fit by the share
+  of a movie's genres was tried, then reverted. It ranked weak fits
+  above strong multi genre fits and made the lists worse for Dharun and
+  Arjun.
+- **Good next step.** Reserve a slot in the top list for a liked genre
+  that is under represented.
+- **Genre dislikes are a soft penalty.** A strong animated title can
+  still appear in the list.
+- **Dropped titles taint all their genres.** When a watched title is
+  dropped, all of its genres are marked as disliked. This is a known
+  simplification.
+
 ## Data credit
 
 Movie data, F. Maxwell Harper and Joseph A. Konstan. 2015. The
