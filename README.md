@@ -1,4 +1,4 @@
-# Streaming Platform Content Recommendation Engine
+# AI Assisted Recommendation Engine
 
 ![Python 3](https://img.shields.io/badge/python-3-blue.svg)
 ![Stage 2 scoring: mock](https://img.shields.io/badge/JEV%20scoring-mock-orange.svg)
@@ -244,7 +244,7 @@ this version of the project, to keep the scope realistic:
 ## Folder structure
 
 ```
-streaming-recommendation-engine/
+AI_Assisted_Recommendation_Engine/
 ├── README.md                     This file
 ├── requirements.txt              Only pytest, everything else is standard Python
 ├── .gitignore
@@ -266,8 +266,8 @@ streaming-recommendation-engine/
 
 ## How to run this project
 
-1. Install Python 3.10 or newer.
-2. From inside the `streaming-recommendation-engine` folder, download
+1. Install Python 3.9 or newer.
+2. From inside the `AI_Assisted_Recommendation_Engine` folder, download
    the real movie data:
    ```
    python data/download_movielens.py
