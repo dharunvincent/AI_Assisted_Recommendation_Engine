@@ -300,12 +300,17 @@ produced by the mock scorer, not a trained model.
 
 | Persona | Top result | Match | Titles above the 72% badge threshold (top 15) |
 |---|---|---|---|
-| Arjun | Fight Club (1999) | 72.8% | 2 |
-| Meera | Toy Story (1995) | 82.5% | 6 |
-| Thomas | Pulp Fiction (1994) | 80.3% | 1 |
-| Dharun | Pulp Fiction (1994) | 81.0% | 6 |
+| Arjun | Four Days in September (1997) | 72.5% | 3 |
+| Meera | Toy Story (1995) | 76.0% | 9 |
+| Thomas | Pulp Fiction (1994) | 76.2% | 3 |
+| Dharun | Pulp Fiction (1994) | 75.6% | 6 |
 
-Meera's next picks are What Happened Was... (76.0%) and Heat (74.5%).
+Meera's next picks are Good Will Hunting (75.7%) and A Thin Line Between
+Love and Hate (75.0%).
+
+Genre fit in stage 2 is scored by the share of a movie's own genres that
+the user likes, not by the raw count, so a title with many genre tags no
+longer beats a focused one just for having more tags.
 
 Content based picks are now spread evenly across a persona's preferred
 genres. Each preferred genre gets its own list of titles with at least
@@ -313,8 +318,8 @@ genres. Each preferred genre gets its own list of titles with at least
 each list in turn. Before this, titles that carried several preferred
 genres crowded out genres that rarely come with a second tag, such as
 Documentary. Documentaries now reach the shortlist for Thomas and
-Dharun, but stage 2 still scores them well below the top 15, so none of
-them show up in the final list yet.
+Dharun, but none of them make the final top 15 yet. Dharun's best
+documentary, Hoop Dreams, ranks 21st.
 
 Genre fixes in stage one: Arjun's keyword matches are now whole word
 and limited to live action Action titles (so "Fast Times at Ridgemont
