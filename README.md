@@ -78,13 +78,16 @@ into one final score out of 100 for each title.
 
 Each generator lives in its own file inside `src/stage1_candidate_generation/`
 
-1. **Content based filtering** (`content_based.py`) Checks the user's
+1. **Content based filtering** (`content_based.py`) Uses the user's
    explicitly declared `preferred_genres` first when they exist, like
-   from an onboarding quiz. Only when that is not set does it infer
-   favourite genres from the titles the user has already watched and
-   liked. Either way it finds other titles sharing those genres. Works
-   well once a user has some history or declared taste, struggles for a
-   brand new user with neither.
+   from an onboarding quiz. Each preferred genre gets its own list of
+   unwatched titles with at least 20 ratings, best known first, and the
+   generator's slots are filled by taking one title from each genre in
+   turn, so the picks are spread evenly across the preferred genres. Only
+   when no preferred genres are set does it infer favourite genres from
+   the titles the user has already watched and liked, and rank titles by
+   how many of those genres they share. Works well once a user has some
+   history or declared taste, struggles for a brand new user with neither.
 
 2. **Collaborative filtering** (`collaborative.py`) Uses the real
    MovieLens ratings from hundreds of real anonymous people to find
@@ -297,11 +300,21 @@ produced by the mock scorer, not a trained model.
 
 | Persona | Top result | Match | Titles above the 72% badge threshold (top 15) |
 |---|---|---|---|
-| Arjun | Heat (1995) | 74.5% | 1 |
-| Meera | Toy Story (1995) | 78.0% | 8 |
-| Thomas | Pulp Fiction (1994) | 74.5% | 1 |
+| Arjun | Fight Club (1999) | 72.8% | 2 |
+| Meera | Toy Story (1995) | 82.5% | 6 |
+| Thomas | Pulp Fiction (1994) | 80.3% | 1 |
+| Dharun | Pulp Fiction (1994) | 81.0% | 6 |
 
-Meera's next picks are Best Men (76.9%) and What Happened Was... (76.0%).
+Meera's next picks are What Happened Was... (76.0%) and Heat (74.5%).
+
+Content based picks are now spread evenly across a persona's preferred
+genres. Each preferred genre gets its own list of titles with at least
+20 ratings, best known first, and the generator takes one title from
+each list in turn. Before this, titles that carried several preferred
+genres crowded out genres that rarely come with a second tag, such as
+Documentary. Documentaries now reach the shortlist for Thomas and
+Dharun, but stage 2 still scores them well below the top 15, so none of
+them show up in the final list yet.
 
 Genre fixes in stage one: Arjun's keyword matches are now whole word
 and limited to live action Action titles (so "Fast Times at Ridgemont
@@ -309,9 +322,9 @@ High" no longer counts as a car movie), and the content based generator
 uses a persona's declared `preferred_genres` instead of genres inferred
 from history, which Action and Crime dramas used to skew. The reasons
 shown for Arjun now say "Action" and Thomas's genre based picks say
-"Documentary, Drama". Many items in both lists still come from the
-trending, popularity and collaborative generators, which do not look at
-genre, so some off taste titles remain.
+"Drama". Many items in all four lists still come from the trending,
+popularity and collaborative generators, which do not look at genre, so
+some off taste titles remain.
 
 ## The Dharun persona, a profile with two rules
 
