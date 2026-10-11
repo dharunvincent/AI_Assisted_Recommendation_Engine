@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from src.user_profile.taste_score import decay_factor, update_dislike_score
 from src.stage1_candidate_generation.merge_shortlist import merge
 from src.exclusion_filter.exclude import exclude
+from src.stage1_candidate_generation.content_based import generate as generate_content_based
 from src.pipeline import build_dislike_scores
 from config.weights import MIN_RATINGS_FOR_QUALITY_FLOOR, SIGNAL_HALF_LIFE_DAYS
 
@@ -81,6 +82,31 @@ class TestQualityFloor(unittest.TestCase):
     def test_no_floor_keeps_everything(self):
         user = {"watch_history": []}
         self.assertEqual(len(exclude(self.shortlist, user, self.catalog)), 4)
+
+
+class TestContentBasedSpread(unittest.TestCase):
+    def test_rare_genre_with_one_qualifying_title_still_gets_a_slot(self):
+        # Twenty well rated titles carry all three of Action, Comedy and
+        # Thriller, so in one shared list they would fill every slot.
+        catalog = {
+            movie_id: {
+                "movie_id": movie_id,
+                "genres": ["Action", "Comedy", "Thriller"],
+                "rating_count": 500 - movie_id,
+                "avg_rating": 4.0,
+            }
+            for movie_id in range(1, 21)
+        }
+        # The only Documentary with enough ratings, plus one with too few.
+        catalog[100] = {"movie_id": 100, "genres": ["Documentary"], "rating_count": 25, "avg_rating": 3.5}
+        catalog[101] = {"movie_id": 101, "genres": ["Documentary"], "rating_count": 3, "avg_rating": 5.0}
+        user = {"watch_history": [], "preferred_genres": ["Action", "Comedy", "Thriller", "Documentary"]}
+
+        picked_ids = [c["movie_id"] for c in generate_content_based(user, catalog, max_candidates=5)]
+
+        self.assertIn(100, picked_ids)
+        self.assertNotIn(101, picked_ids)  # too few ratings to qualify
+        self.assertEqual(len(picked_ids), len(set(picked_ids)))  # no duplicates
 
 
 class TestExplicitGenreDislike(unittest.TestCase):

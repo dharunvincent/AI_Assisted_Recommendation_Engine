@@ -77,3 +77,12 @@ STAGE1_SHORTLIST_MAX_SIZE = 50
 # with thousands of ratings averaging slightly lower.
 # -----------------------------------------------------------------------
 MIN_RATINGS_FOR_QUALITY_FLOOR = 20
+
+# -----------------------------------------------------------------------
+# CONTENT BASED MINIMUM RATINGS
+# When the content based generator picks titles for a user's preferred
+# genres, it only considers titles rated by at least this many people.
+# Without it, obscure titles with a handful of ratings could take slots
+# that better known titles in the same genre should have.
+# -----------------------------------------------------------------------
+MIN_RATINGS_FOR_CONTENT_BASED = 20
