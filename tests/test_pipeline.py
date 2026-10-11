@@ -18,7 +18,6 @@ from src.stage1_candidate_generation.merge_shortlist import merge
 from src.exclusion_filter.exclude import exclude
 from src.stage1_candidate_generation.content_based import generate as generate_content_based
 from src.pipeline import build_dislike_scores
-from src.stage2_jev_ranking.scoring_questions import build_questions
 from config.weights import MIN_RATINGS_FOR_QUALITY_FLOOR, SIGNAL_HALF_LIFE_DAYS
 
 
@@ -108,22 +107,6 @@ class TestContentBasedSpread(unittest.TestCase):
         self.assertIn(100, picked_ids)
         self.assertNotIn(101, picked_ids)  # too few ratings to qualify
         self.assertEqual(len(picked_ids), len(set(picked_ids)))  # no duplicates
-
-
-class TestGenreFitByShare(unittest.TestCase):
-    def taste_bias(self, genres, genre_overlap_count):
-        movie = {"genres": genres, "avg_rating": 4.0}
-        candidate = {"sources": []}
-        questions = build_questions(movie, candidate, dislike_penalty=0.0, genre_overlap_count=genre_overlap_count)
-        return questions["taste_fit"].bias_hint
-
-    def test_focused_movie_beats_many_genre_movie_with_one_liked_genre(self):
-        one_genre_movie = self.taste_bias(["Documentary"], genre_overlap_count=1)
-        three_genre_movie = self.taste_bias(["Action", "Comedy", "Thriller"], genre_overlap_count=1)
-        self.assertGreater(one_genre_movie, three_genre_movie)
-
-    def test_movie_with_no_genres_gets_no_genre_bonus(self):
-        self.assertAlmostEqual(self.taste_bias([], genre_overlap_count=0), 0.5)
 
 
 class TestExplicitGenreDislike(unittest.TestCase):

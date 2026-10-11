@@ -86,14 +86,3 @@ MIN_RATINGS_FOR_QUALITY_FLOOR = 20
 # that better known titles in the same genre should have.
 # -----------------------------------------------------------------------
 MIN_RATINGS_FOR_CONTENT_BASED = 20
-
-# -----------------------------------------------------------------------
-# GENRE FIT BONUS
-# The most a title can add to its expected taste fit for matching genres
-# the user likes. The bonus is this number times the share of the title's
-# own genres the user likes, so a one genre title the user likes gets the
-# full bonus, and a three genre title where only one genre is liked gets a
-# third of it. Scoring by share instead of raw count stops titles with
-# many genre tags from beating focused titles just for having more tags.
-# -----------------------------------------------------------------------
-GENRE_FIT_MAX_BONUS = 0.36

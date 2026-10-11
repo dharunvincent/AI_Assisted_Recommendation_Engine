@@ -22,7 +22,6 @@ rank.py.
 """
 
 from src.stage2_jev_ranking.jev_client import Score, Choice
-from config.weights import GENRE_FIT_MAX_BONUS
 
 
 def build_state(user, movie, candidate, context, dislike_penalty):
@@ -49,20 +48,12 @@ def build_questions(movie, candidate, dislike_penalty, genre_overlap_count):
     Returns the dict of questions to send to jev_client.ask(), each
     carrying a bias_hint worked out from simple real facts. See
     jev_client.py for why the mock needs this hint.
-
-    genre_overlap_count is how many of the movie's genres the user likes.
-    It feeds the taste bias as a share of the movie's own genres, and it
-    also feeds the dislike override question as a raw count.
     """
-    # Rough expectation for taste fit. The genre bonus is based on the
-    # share of this movie's own genres that the user likes, not on the
-    # raw count, so a movie with many genre tags gets no advantage just
-    # for having more tags. An active dislike penalty pulls the
-    # expectation back down. This is where the dislike override logic
-    # from the brainstorm lives, see rank.py for how the override is
-    # resolved.
-    liked_genre_share = genre_overlap_count / len(movie["genres"]) if movie["genres"] else 0.0
-    taste_bias = 0.5 + (liked_genre_share * GENRE_FIT_MAX_BONUS) - (dislike_penalty * 0.25)
+    # Rough expectation for taste fit, more genre overlap with things
+    # the user already liked pushes this up, an active dislike penalty
+    # pulls it back down. This is where the dislike override logic from
+    # the brainstorm lives, see rank.py for how the override is resolved.
+    taste_bias = 0.5 + (genre_overlap_count * 0.12) - (dislike_penalty * 0.25)
 
     # Rough expectation for completion likelihood, a well regarded movie
     # in the real MovieLens data is a reasonable proxy for "most people
