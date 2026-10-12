@@ -22,6 +22,15 @@ rank.py.
 """
 
 from src.stage2_jev_ranking.jev_client import Score, Choice
+from config.weights import (
+    TASTE_BIAS_BASE,
+    TASTE_BIAS_PER_GENRE_OVERLAP,
+    CONTEXT_BIAS_FROM_CONTEXT_GENERATOR,
+    CONTEXT_BIAS_DEFAULT,
+    OVERRIDE_BIAS_STRONG_FIT,
+    OVERRIDE_BIAS_WEAK_FIT,
+    OVERRIDE_MIN_GENRE_OVERLAP,
+)
 
 
 def build_state(user, movie, candidate, context, dislike_penalty):
@@ -50,10 +59,11 @@ def build_questions(movie, candidate, dislike_penalty, genre_overlap_count):
     jev_client.py for why the mock needs this hint.
     """
     # Rough expectation for taste fit, more genre overlap with things
-    # the user already liked pushes this up, an active dislike penalty
-    # pulls it back down. This is where the dislike override logic from
-    # the brainstorm lives, see rank.py for how the override is resolved.
-    taste_bias = 0.5 + (genre_overlap_count * 0.12) - (dislike_penalty * 0.25)
+    # the user already liked pushes this up. The dislike penalty is
+    # deliberately NOT part of this number. It is applied exactly once,
+    # in rank.py, so that the override logic can soften it cleanly. If it
+    # was also subtracted here, the override could never fully work.
+    taste_bias = TASTE_BIAS_BASE + (genre_overlap_count * TASTE_BIAS_PER_GENRE_OVERLAP)
 
     # Rough expectation for completion likelihood, a well regarded movie
     # in the real MovieLens data is a reasonable proxy for "most people
@@ -64,11 +74,14 @@ def build_questions(movie, candidate, dislike_penalty, genre_overlap_count):
     # Rough expectation for context fit, if this candidate already came
     # from the context_aware generator in stage 1, it already fits the
     # current moment reasonably well.
-    context_bias = 0.75 if "context_aware" in candidate["sources"] else 0.45
+    context_bias = (
+        CONTEXT_BIAS_FROM_CONTEXT_GENERATOR if "context_aware" in candidate["sources"] else CONTEXT_BIAS_DEFAULT
+    )
 
     return {
         "taste_fit": Score(
-            "How well does this match this user's personal taste?",
+            "Ignoring any general dislike of this genre, how well does this "
+            "match this user's personal taste?",
             bias_hint=taste_bias,
         ),
         "completion_likelihood": Score(
@@ -83,6 +96,10 @@ def build_questions(movie, candidate, dislike_penalty, genre_overlap_count):
             "Despite a general dislike signal for this genre, does this "
             "specific title stand out enough for this user to override it?",
             options=["override_show_anyway", "keep_penalty"],
-            bias_hint=0.7 if genre_overlap_count >= 2 and dislike_penalty > 0 else 0.1,
+            bias_hint=(
+                OVERRIDE_BIAS_STRONG_FIT
+                if genre_overlap_count >= OVERRIDE_MIN_GENRE_OVERLAP and dislike_penalty > 0
+                else OVERRIDE_BIAS_WEAK_FIT
+            ),
         ),
     }

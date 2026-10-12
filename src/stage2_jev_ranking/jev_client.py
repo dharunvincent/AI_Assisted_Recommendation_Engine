@@ -26,7 +26,12 @@ is the whole point of mirroring the real request shape here.
 
 import hashlib
 
+# These numbers describe how the MOCK behaves. They are not product settings
+# and do not belong in config/weights.py. A real JEV model would return its
+# own confidence, so none of this exists in the real SDK.
 NOISE_RANGE = 0.3  # how much the mock is allowed to wobble around the bias hint
+MOCK_CONFIDENCE_FLOOR = 0.6   # the lowest confidence the mock ever reports
+MOCK_CONFIDENCE_SPAN = 0.35   # confidence is spread over floor to floor + span
 
 
 class Score:
@@ -73,27 +78,46 @@ def ask(state, questions):
     answers = {}
 
     for key, question in questions.items():
-        pseudo_random_value = _deterministic_pseudo_random(state_fingerprint + key)
-        wobble = (pseudo_random_value - 0.5) * NOISE_RANGE
+        seed_text = state_fingerprint + key
+        pseudo_random_value = _deterministic_pseudo_random(seed_text)
+
+        # Confidence gets its own hash on purpose. If it was built from the
+        # same number as the answer, a confident answer and a "yes" answer
+        # would be tied together, and the confidence gate in rank.py would
+        # pass far more often than it should.
+        confidence_value = _deterministic_pseudo_random(seed_text + "|confidence")
+        confidence = round(MOCK_CONFIDENCE_FLOOR + confidence_value * MOCK_CONFIDENCE_SPAN, 3)
 
         if question.question_type == "score":
+            wobble = (pseudo_random_value - 0.5) * NOISE_RANGE
             answer = max(0.0, min(1.0, question.bias_hint + wobble))
             answers[key] = {
                 "question": question.question_text,
                 "answer": round(answer, 3),
-                "confidence": round(0.6 + pseudo_random_value * 0.35, 3),
+                "confidence": confidence,
             }
         elif question.question_type == "choice":
-            # Lean toward the first option (treated as the positive
-            # option by convention) when the bias hint is high.
-            if pseudo_random_value < question.bias_hint:
-                chosen_index = 0
-            else:
-                chosen_index = int(pseudo_random_value * len(question.options)) % len(question.options)
             answers[key] = {
                 "question": question.question_text,
-                "answer": question.options[chosen_index],
-                "confidence": round(0.6 + pseudo_random_value * 0.35, 3),
+                "answer": _pick_option(question, pseudo_random_value, seed_text),
+                "confidence": confidence,
             }
 
     return answers
+
+
+def _pick_option(question, pseudo_random_value, seed_text):
+    """
+    The first option is treated as the positive option by convention. It is
+    picked only when the pseudo random value falls below the bias hint, so a
+    bias hint of 0.1 gives the first option about 10 percent of the time.
+    Otherwise one of the remaining options is picked using a second, separate
+    hash, so the choice stays deterministic but is not tied to the first one.
+    """
+    options = question.options
+    if pseudo_random_value < question.bias_hint or len(options) == 1:
+        return options[0]
+
+    other_options = options[1:]
+    second_value = _deterministic_pseudo_random(seed_text + "|alternative")
+    return other_options[int(second_value * len(other_options)) % len(other_options)]

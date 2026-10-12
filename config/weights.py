@@ -86,3 +86,91 @@ MIN_RATINGS_FOR_QUALITY_FLOOR = 20
 # that better known titles in the same genre should have.
 # -----------------------------------------------------------------------
 MIN_RATINGS_FOR_CONTENT_BASED = 20
+
+# -----------------------------------------------------------------------
+# WHAT COUNTS AS LIKED, NEUTRAL AND DISLIKED
+# One place defines how a watch is read, so no file has its own private
+# idea of "liked". Completion is the share of the title the user watched.
+#   0.7 or more        liked, the user stayed with it
+#   0.2 up to 0.7      neutral, neither a like nor a dislike
+#   below 0.2          a dislike signal, the user left early
+# "Not liked" is NOT the same as "disliked". Leaving early is a clear
+# dislike. Stopping somewhere in the middle can have many reasons (fell
+# asleep, got busy, got interrupted), so we do not punish it. A neutral
+# watch creates no dislike score at all.
+# Inside the dislike band, taste_score.py still decides the strength: below
+# EARLY_DROP_OFF_CUTOFF is the strong early drop off signal, and the rest
+# of the band is the weaker partial signal.
+# -----------------------------------------------------------------------
+LIKED_COMPLETION_THRESHOLD = 0.7
+DISLIKE_SIGNAL_MAX_COMPLETION = 0.2
+
+# A drop off between the early cutoff and DISLIKE_SIGNAL_MAX_COMPLETION is
+# counted as this share of the strong early drop off weight.
+SIGNAL_WEIGHT_DROP_OFF_MIDDLE_FACTOR = 0.5
+
+# A dislike score never grows past this, so repeated signals cannot make it
+# grow without limit.
+DISLIKE_SCORE_CAP = 3.0
+
+# -----------------------------------------------------------------------
+# STAGE 2 DISLIKE PENALTY AND OVERRIDE
+# -----------------------------------------------------------------------
+# How strongly the dislike score pulls a title's taste fit down. The penalty
+# is now applied in one place only (rank.py). It used to be subtracted twice,
+# about 0.25 inside the taste expectation and 0.3 in rank.py, roughly 0.55 in
+# total. This single value keeps the total animation penalty about as strong
+# as before.
+DISLIKE_PENALTY_SCALE = 0.55
+# If the override question answers "show anyway" with at least this much
+# confidence, the penalty is mostly lifted for that one title.
+OVERRIDE_CONFIDENCE_THRESHOLD = 0.65
+# The share of the penalty that stays when the override fires.
+OVERRIDE_PENALTY_RETAINED = 0.25
+
+# -----------------------------------------------------------------------
+# STAGE 2 EXPECTATIONS HANDED TO THE MOCK JEV
+# These are the rough "bias hints" worked out from simple facts, see
+# src/stage2_jev_ranking/scoring_questions.py.
+# -----------------------------------------------------------------------
+# Expected taste fit starts here and rises with every genre the title shares
+# with things the user liked.
+TASTE_BIAS_BASE = 0.5
+TASTE_BIAS_PER_GENRE_OVERLAP = 0.12
+# Expected context fit: higher when the title already came from the
+# context aware generator in stage 1.
+CONTEXT_BIAS_FROM_CONTEXT_GENERATOR = 0.75
+CONTEXT_BIAS_DEFAULT = 0.45
+# Expected answer to the override question: strong when the title shares at
+# least OVERRIDE_MIN_GENRE_OVERLAP liked genres and a penalty is active,
+# weak otherwise.
+OVERRIDE_BIAS_STRONG_FIT = 0.7
+OVERRIDE_BIAS_WEAK_FIT = 0.1
+OVERRIDE_MIN_GENRE_OVERLAP = 2
+
+# -----------------------------------------------------------------------
+# STAGE 1 GENERATOR CUT OFFS
+# -----------------------------------------------------------------------
+# Collaborative filtering only learns from ratings at or above this.
+COLLAB_HIGH_RATING_THRESHOLD = 4.0
+# Diversity injection only offers titles rated at least this well.
+DIVERSITY_MIN_AVG_RATING = 3.8
+
+# -----------------------------------------------------------------------
+# BUSINESS WEIGHT: PROMOTION IS A SMALL NUDGE
+# A normal, non promoted title has a business weight of 0.0, so it adds
+# nothing to its score. A promoted title gets a weight above that, up to
+# BUSINESS_WEIGHT_MAX_PROMOTION. The weight counts for 15 percent of the final
+# score, so the biggest possible promotion is worth 0.5 times 0.15 times 100,
+# which is 7.5 extra points. That is a small nudge, not a head start.
+# -----------------------------------------------------------------------
+BUSINESS_WEIGHT_NEUTRAL = 0.0
+BUSINESS_WEIGHT_MAX_PROMOTION = 0.5
+
+# -----------------------------------------------------------------------
+# COLLABORATIVE FILTERING MINIMUM SHARED USERS
+# Two movies are only treated as linked if at least this many users rated
+# both highly. Very small counts are noise: two users agreeing by chance
+# says nothing about what a third user would enjoy.
+# -----------------------------------------------------------------------
+COLLAB_MIN_CO_OCCURRENCE = 3

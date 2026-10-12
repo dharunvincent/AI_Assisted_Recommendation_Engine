@@ -61,10 +61,15 @@ The engine runs in two stages.
 
 **Stage one, candidate generation.** Eight independent methods each look
 at the user and the catalog from a different angle, and each one
-produces a small list of candidate titles. All eight run at the same
-time. Their output gets merged into one shortlist of around 30 to 50
-titles. A cleanup step called the exclusion filter then removes anything
-the user has already watched or has explicitly blocked.
+produces a small list of candidate titles. In a real platform the eight
+would run in parallel, each as its own service. In this project they run
+one after another, because inside one Python process this work is pure
+CPU, so parallel threads would not make it faster. Their output gets
+merged into one list. A cleanup step called the exclusion filter then
+removes anything the user has already watched, has explicitly blocked, or
+that falls below the user's own quality floor. Only after that is the list
+trimmed to the best 30 to 50 titles, so titles the filter removes never
+take up a place that another title should have had.
 
 **Stage two, JEV ranking.** The shortlist from stage one, now cleaned up,
 goes to JEV. JEV does not search the whole catalog, it is not built for
@@ -95,7 +100,11 @@ Each generator lives in its own file inside `src/stage1_candidate_generation/`
    movie B highly. This is the exact Harry Potter style example that
    came up while designing this project, watch and like the first one,
    get the second one recommended because other real viewers followed
-   that same pattern.
+   that same pattern. Links are scored with cosine similarity, which
+   divides the number of shared fans by the square root of the two
+   movies' fan counts, so a blockbuster that everybody liked no longer
+   wins for every user just because it shares fans with everything. Pairs
+   with fewer than 3 shared fans are ignored as noise.
 
 3. **Demographic filtering** (`demographic.py`) Recommends titles that
    tend to suit the user's age group, useful mainly for new users with
@@ -128,17 +137,24 @@ Each generator lives in its own file inside `src/stage1_candidate_generation/`
    so the user does not get stuck seeing more of the same thing forever.
    This exists specifically to fight the filter bubble problem.
 
-All eight run at once and their results get merged and deduplicated in
+All eight are designed to run in parallel in a real platform, and run one
+after another in this project, because threads give no speed up for pure
+CPU work in one Python process. Their results get merged and deduplicated in
 `merge_shortlist.py`. If more than one generator independently suggests
-the same title, that title is treated as a stronger candidate.
+the same title, that title is treated as a stronger candidate. Ties are
+settled by best position, so a title that was some generator's top pick
+beats one that only barely made another generator's list.
 
 ## The exclusion filter
 
 `src/exclusion_filter/exclude.py` sits between stage one and stage two.
 It does not add anything, it only removes. It removes titles the user
-has already watched, as a safety net, and titles the user explicitly
-told the system to never recommend again. This is different from a soft
-dislike, which stage two still handles with a penalty, not a removal.
+has already watched, as a safety net, titles the user explicitly told the
+system to never recommend again, and, for a user who set a quality floor,
+titles rated below it, with no rating, or with fewer than 20 ratings (a
+high average from only a few raters cannot be trusted). This is different
+from a soft dislike, which stage two still handles with a penalty, not a
+removal. The list is trimmed to its maximum size only after this step.
 
 ## Stage two, JEV ranking, in detail
 
@@ -148,7 +164,9 @@ TypeSafe's own cookbooks, several small specific questions combined in
 code, rather than one big vague question.
 
 The three main questions are:
-1. **Taste fit**, how well does this match the user's personal taste
+1. **Taste fit**, how well does this match the user's personal taste,
+   asked as "ignoring any general dislike of this genre", so the answer is
+   a before penalty score
 2. **Completion likelihood**, how likely is the user to actually finish
    watching this, not just start it
 3. **Context fit**, how well does this suit the user's current situation
@@ -158,7 +176,9 @@ dislike penalty is already active, explained below.
 
 These answers get combined with a business weight (coming straight from
 stage one's business rules generator, not from JEV) into one final
-score, using fixed weights set in `config/weights.py`:
+score, using fixed weights set in `config/weights.py`. A normal title has
+a business weight of 0 and a promoted title gets a small positive weight,
+so promotion is worth at most 7.5 extra points:
 
 - Taste fit, 45 percent of the final score
 - Completion likelihood, 25 percent
@@ -185,6 +205,10 @@ penalty. If JEV answers yes with reasonable confidence, the penalty is
 mostly lifted for that one title. If not, the penalty stays. This
 matches the exact choice made during planning, a heavily weighted soft
 penalty that JEV can occasionally overrule, rather than a complete block.
+The penalty is applied in exactly one place, `rank.py`. It is never also
+folded into the taste fit question, which would count it twice and stop
+the override from working. In the mock, the override question is answered
+"show anyway" rarely for weak fits and often for strong fits.
 
 ### How the dislike score itself is built, the decay formula
 
@@ -196,12 +220,18 @@ should not need to be recalculated from scratch every single time either.
 new_score = old_score * decay_factor_for_elapsed_time + new_signal_weight
 ```
 
-Every signal loses half its strength every 60 days. A dislike from
-today matters a lot, the same dislike a year ago matters very little.
+Every signal loses half its strength every 60 days, and every score is
+also faded up to today whenever it is read, so an old dislike with no
+newer event still fades away. A dislike from today matters a lot, the
+same dislike a year ago matters very little.
 Different behaviours carry different starting strength, an explicit
 thumbs down counts for more than quietly skipping a title in the first
 15 percent of its runtime, which in turn counts for more than simply
-never opening something sitting in the watchlist. This is designed to
+never opening something sitting in the watchlist. Only leaving early
+counts as a dislike. A watch is read in three bands: 70 percent or more is
+liked, below 20 percent is a dislike signal, and anything in between is
+neutral and creates no dislike at all, because stopping midway can have
+many reasons such as falling asleep or getting busy. This is designed to
 be updated incrementally as events happen, not recalculated from the
 user's entire history on every single request, which keeps it fast.
 
@@ -252,19 +282,23 @@ AI_Assisted_Recommendation_Engine/
 ├── requirements.txt              Only pytest, everything else is standard Python
 ├── .gitignore
 ├── config/
-│   └── weights.py                Every tunable number, weights, thresholds, decay settings
+│   └── weights.py                Every scoring weight and threshold, in one place
 ├── data/
 │   ├── README.md                 Explains the MovieLens dataset and the synthetic data
 │   └── download_movielens.py     Run this once to download the real dataset
 ├── src/
 │   ├── catalog.py                 Loads the MovieLens CSV files into memory
 │   ├── pipeline.py                 The main entry point, runs everything end to end
+│   ├── evaluate.py                 Offline evaluation on real MovieLens users
 │   ├── stage1_candidate_generation/   The eight generators, plus the merge step
-│   ├── exclusion_filter/            Removes watched and blocked titles
+│   ├── exclusion_filter/            Removes watched, blocked and low quality titles
 │   ├── stage2_jev_ranking/          The mock JEV client, the questions, and the ranking logic
 │   └── user_profile/                Synthetic personas and the dislike decay formula
 └── tests/
-    └── test_pipeline.py           Small smoke tests for the core logic
+    ├── test_pipeline.py           Tests for the core logic, filters, merge and decay
+    ├── test_rank.py               Tests for the stage 2 penalty, override, business weight and badge
+    ├── test_jev_client.py         Tests for how the mock JEV client behaves
+    └── test_evaluate.py           Tests that the evaluation split never leaks an answer
 ```
 
 ## How to run this project
@@ -282,9 +316,13 @@ AI_Assisted_Recommendation_Engine/
    This prints a ranked, scored recommendation list for each of the
    four synthetic personas. To run just one, add `--persona` and a
    first name, for example `python -m src.pipeline --persona dharun`.
-4. Optional, run the smoke tests:
+4. Optional, run all the tests:
    ```
-   python -m unittest tests.test_pipeline
+   python -m unittest discover tests
+   ```
+5. Optional, run the offline evaluation (see the Evaluation section):
+   ```
+   python -m src.evaluate
    ```
 
 No API keys and no paid services are needed to run this project.
@@ -301,20 +339,31 @@ produced by the mock scorer, not a trained model.
 | Persona | Top result | Match | Titles above the 72% badge threshold (top 15) |
 |---|---|---|---|
 | Arjun | Fight Club (1999) | 72.8% | 2 |
-| Meera | Toy Story (1995) | 82.5% | 6 |
-| Thomas | Pulp Fiction (1994) | 80.3% | 1 |
-| Dharun | Pulp Fiction (1994) | 81.0% | 6 |
+| Meera | What Happened Was... (1994) | 76.0% | 5 |
+| Thomas | Pulp Fiction (1994) | 72.8% | 1 |
+| Dharun | Usual Suspects, The (1995) | 74.4% | 6 |
 
-Meera's next picks are What Happened Was... (76.0%) and Heat (74.5%).
+Meera's next picks are Toy Story (75.0%) and Heat (74.5%).
 
-Content based picks are now spread evenly across a persona's preferred
+What changed compared to the table before the code review, in plain
+English. Meera's top pick used to be Toy Story (82.5%) and Dharun's used to
+be Pulp Fiction (81.0%). Those two were the promoted titles in the example
+promotion list, and promotion used to hand them up to 13.5 free points over
+every other title, so they won because they were promoted, not because of
+taste. Promotion is now a nudge of at most 7.5 points, and the other
+persona lists changed too, because collaborative filtering no longer
+favours blockbusters and ties in the merge now go to each generator's
+strongest picks. The badge counts stayed the same for Arjun, Thomas and
+Dharun, and went from 6 to 5 for Meera.
+
+Content based picks are spread evenly across a persona's preferred
 genres. Each preferred genre gets its own list of titles with at least
 20 ratings, best known first, and the generator takes one title from
 each list in turn. Before this, titles that carried several preferred
 genres crowded out genres that rarely come with a second tag, such as
 Documentary. Documentaries now reach the shortlist for Thomas and
-Dharun, but stage 2 still scores them well below the top 15, so none of
-them show up in the final list yet.
+Dharun, but none of them make the final top 15. Dharun's best
+documentary, Hoop Dreams, ranks 33rd with 54.7%.
 
 Genre fixes in stage one: Arjun's keyword matches are now whole word
 and limited to live action Action titles (so "Fast Times at Ridgemont
@@ -342,7 +391,8 @@ work in two different ways on purpose:
 2. **The rating floor is a hard rule.** A user who says they never
    watch anything rated below 6 out of 10 is not leaning, they are
    asking for a filter. So the exclusion filter removes those titles
-   before stage 2 ever sees them, along with titles that have no rating.
+   before stage 2 ever sees them, along with titles that have no rating or
+   fewer than 20 ratings.
 
 Two honest limits. MovieLens rates out of 5 and has no IMDb scores, so
 6 out of 10 is stood in for by 3.0 out of 5. And MovieLens only has
@@ -354,6 +404,100 @@ python -m src.pipeline --persona dharun
 
 The output shows each title's average rating, and ends with a dislike
 check that counts how many animated titles reached the top 15.
+
+## Evaluation
+
+Every percentage printed by the pipeline comes from the mock, so it cannot
+tell you whether the engine recommends well. `src/evaluate.py` measures
+something real instead. Run it with:
+
+```
+python -m src.evaluate
+```
+
+How it works. It picks 100 real MovieLens users with a fixed seed, so every
+run uses the same ones. For each user it sorts their ratings by time and
+hides their last 5 ratings of 4 stars or more as the "answers". Everything
+before the first hidden rating becomes their watch history. Then it runs
+the real pipeline and checks whether the hidden titles show up. The
+collaborative table is built without the hidden ratings, so it never sees
+the answers it is tested on. A rating becomes a completion like this: 4 or
+more is 0.95 (liked), 3 or 3.5 is 0.6 (neutral), 2.5 or less is 0.1 (a
+dislike signal).
+
+Results from one run (500 hidden answers, 5 per user). Running it again
+gives the same numbers.
+
+| Measure | Result |
+|---|---|
+| Stage 1 recall, hidden titles that reached the shortlist | 13.2% |
+| Recall of collaborative filtering alone | 10.0% |
+| Recall of trending alone | 7.4% |
+| Recall of content based alone | 1.6% |
+| Recall of business rules alone | 0.4% |
+| Recall of demographic, context aware, session based and diversity | 0.0% each |
+
+| Top 10 | Hit Rate | Recall |
+|---|---|---|
+| This engine, after stage 2 | 22.0% | 4.6% |
+| Plain "most popular titles" list | 22.0% | 5.8% |
+
+Hit Rate is the share of users with at least one hidden title in their top
+10. Recall is the share of all hidden titles found in the top 10.
+
+Honest reading. On this test the engine does not beat a plain list of the
+most popular titles: the Hit Rate is the same and the Recall is slightly
+lower. Collaborative filtering and trending do almost all the work in stage
+1. The genre based generators find almost nothing here because these test
+users have no declared genres, no age group and no live session, so several
+generators have nothing to work with. That is a fair result for a
+prototype whose scoring layer is a mock.
+
+Limits of this evaluation:
+- It is small, about 600 users in the dataset and 100 tested, so the numbers
+  are noisy.
+- The rating to completion mapping is a proxy, not real watch data.
+- Stage 2 uses the mock scorer, so the stage 2 numbers measure the mock's
+  simple rules, not a real JEV model.
+- Catalog averages and rating counts still include the hidden ratings. This
+  small leak affects trending, the quality floor and the mock scorer, and it
+  also helps the popularity baseline.
+- Every user gets the same example context (Friday evening).
+
+## Changes after code review
+
+A code review found the problems below, and each was fixed:
+
+1. **Every scoring number now lives in `config/weights.py`.** Numbers were
+   hidden inside logic files, and "liked" meant different things in
+   different files. One shared rule now reads a watch as liked (70 percent
+   or more), neutral, or a dislike signal (under 20 percent), so stopping
+   midway no longer counts as a dislike.
+2. **The dislike penalty is applied once.** It was subtracted in two places,
+   so the override could never fully work. It now lives only in `rank.py`.
+3. **The mock's override is rare for weak fits.** A flawed choice rule and a
+   confidence number tied to the answer let weak fits override about one time
+   in three. A test now checks the rates (about 10 percent and 70 percent).
+4. **Dislikes fade up to today.** A score only decayed when a new event
+   arrived, so an old dislike kept full strength. It is now faded when read.
+5. **Promotion is a small nudge.** Two promoted titles used to get up to 13.5
+   free points and won on promotion alone. A promoted title now gets at most
+   7.5 points and a normal title gets none.
+6. **Filter first, then trim.** The list was cut to 50 before the filter
+   removed titles, which could leave too few. Ties also went to whichever
+   generator ran first. Now it merges, filters, then trims, and ties go to
+   each generator's strongest picks.
+7. **Generators run one after another.** The threads gave no speed up for
+   CPU work and the global random seed could affect other code. Each file
+   now uses its own random generator. The results did not change.
+8. **Collaborative filtering uses cosine similarity.** Raw counts made
+   blockbusters win for everyone. Links are now normalised by popularity and
+   noisy pairs are dropped.
+9. **The ranking logic has tests.** Nothing tested the penalty, override,
+   business weight or badge. `tests/test_rank.py` now does.
+10. **There is a real evaluation.** Before, nothing measured whether the
+    engine recommends well. `src/evaluate.py` now does, with a hold out
+    split, a leak free collaborative table and a popularity baseline.
 
 ## Known limits of this version
 
@@ -377,11 +521,21 @@ check that counts how many animated titles reached the top 15.
   Arjun.
 - **Good next step.** Reserve a slot in the top list for a liked genre
   that is under represented.
+- **Promotion is a small score nudge.** A promoted title gets up to
+  7.5 extra points. Real platforms often show promoted titles in their
+  own row or a reserved slot instead of boosting their score. This
+  project uses a small score nudge to keep things simple.
 - **Genre dislikes are a soft penalty.** A strong animated title can
   still appear in the list.
 - **Dropped titles taint all their genres.** When a watched title is
-  dropped, all of its genres are marked as disliked. This is a known
-  simplification.
+  left early (under 20 percent watched), all of its genres are marked as
+  disliked. This is a known simplification.
+- **Tie breaks use list order.** When two titles have the same number of
+  sources, the merge prefers the one with the better position in a
+  generator's list. Some generators (context aware, session based) do not
+  sort their list by quality, so position is only a rough signal there.
+- **The evaluation is small and rough.** See the Evaluation section for its
+  limits.
 
 ## Data credit
 

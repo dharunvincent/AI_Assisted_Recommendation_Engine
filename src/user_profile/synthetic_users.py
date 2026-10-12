@@ -98,8 +98,8 @@ def _find_top_movies_by_genre(catalog, genres, limit=20, min_ratings=MIN_RATING_
     return matches[:limit]
 
 
-def _random_timestamp_within_last_days(days):
-    return datetime.now() - timedelta(days=random.randint(1, days), hours=random.randint(0, 23))
+def _random_timestamp_within_last_days(days, rng):
+    return datetime.now() - timedelta(days=rng.randint(1, days), hours=rng.randint(0, 23))
 
 
 def build_persona_user(persona, catalog, random_seed=None):
@@ -110,8 +110,9 @@ def build_persona_user(persona, catalog, random_seed=None):
     animated movie the persona dislikes, to exercise the dislike
     override logic.
     """
-    if random_seed is not None:
-        random.seed(random_seed)
+    # A private random generator, so seeding one persona never changes the
+    # random numbers used by any other code in the program.
+    rng = random.Random(random_seed)
 
     user = {
         "user_id": persona["user_id"],
@@ -141,8 +142,8 @@ def build_persona_user(persona, catalog, random_seed=None):
         for movie in liked_titles[:6]:
             user["watch_history"].append({
                 "movie_id": movie["movie_id"],
-                "completion_pct": round(random.uniform(0.85, 1.0), 2),
-                "timestamp": _random_timestamp_within_last_days(180),
+                "completion_pct": round(rng.uniform(0.85, 1.0), 2),
+                "timestamp": _random_timestamp_within_last_days(180, rng),
             })
 
         # Deliberately include an animated movie about cars that this
@@ -157,7 +158,7 @@ def build_persona_user(persona, catalog, random_seed=None):
             user["watch_history"].append({
                 "movie_id": movie["movie_id"],
                 "completion_pct": 0.1,
-                "timestamp": _random_timestamp_within_last_days(90),
+                "timestamp": _random_timestamp_within_last_days(90, rng),
             })
 
     else:
@@ -169,21 +170,21 @@ def build_persona_user(persona, catalog, random_seed=None):
             picked = {}
             for genre in persona["preferred_genres"]:
                 pool = _find_top_movies_by_genre(catalog, [genre], excluded_genres=disliked)
-                for movie in random.sample(pool, min(persona["titles_per_genre"], len(pool))):
+                for movie in rng.sample(pool, min(persona["titles_per_genre"], len(pool))):
                     picked[movie["movie_id"]] = movie
             chosen = list(picked.values())
         else:
             top_matches = _find_top_movies_by_genre(
                 catalog, persona["preferred_genres"], excluded_genres=disliked
             )
-            chosen = random.sample(top_matches, min(6, len(top_matches)))
+            chosen = rng.sample(top_matches, min(6, len(top_matches)))
 
         low, high = persona["completion_range"]
         for movie in chosen:
             user["watch_history"].append({
                 "movie_id": movie["movie_id"],
-                "completion_pct": round(random.uniform(low, high), 2),
-                "timestamp": _random_timestamp_within_last_days(180),
+                "completion_pct": round(rng.uniform(low, high), 2),
+                "timestamp": _random_timestamp_within_last_days(180, rng),
             })
 
     return user

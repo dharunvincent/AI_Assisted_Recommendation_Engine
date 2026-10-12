@@ -20,12 +20,11 @@ Or for one persona only:  python -m src.pipeline --persona dharun
 """
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from src.catalog import load_catalog
 from src.user_profile.synthetic_users import build_all_personas
-from src.user_profile.taste_score import update_dislike_score
+from src.user_profile.taste_score import update_dislike_score, decay_to
 from src.exclusion_filter.exclude import exclude
 from src.stage2_jev_ranking.rank import rank_candidates
 
@@ -40,58 +39,88 @@ from src.stage1_candidate_generation import (
     diversity,
 )
 from src.stage1_candidate_generation.merge_shortlist import merge
-from config.weights import STAGE1_SHORTLIST_MIN_SIZE
+from config.weights import (
+    STAGE1_SHORTLIST_MIN_SIZE,
+    STAGE1_SHORTLIST_MAX_SIZE,
+    DISLIKE_SIGNAL_MAX_COMPLETION,
+)
 
 
-def run_stage1(user, catalog, context):
+def run_generators(user, catalog, context, similarity_table=None):
     """
-    Runs all eight generators. They are independent of each other and
-    each one only reads data, it never writes anything, so they are
-    safe to run in parallel threads to save wall clock time.
+    Runs all eight generators one after another. Returns a dict of generator
+    name mapped to that generator's own candidate list, in running order.
+    similarity_table lets the evaluation hand collaborative filtering a table
+    that was built without the held out ratings, see src/evaluate.py.
+
+    In a real platform each generator would be its own service, called in
+    parallel over the network, and parallel calls really do save time there
+    because each service does its own work. Inside this one Python process
+    the generators are pure CPU work, so threads would give no speed up
+    (Python lets only one thread run Python code at a time). A plain loop is
+    simpler and gives exactly the same answers.
     """
-    jobs = [
-        lambda: content_based.generate(user, catalog),
-        lambda: collaborative.generate(user, catalog),
-        lambda: demographic.generate(user, catalog),
-        lambda: trending.generate(user, catalog),
-        lambda: context_aware.generate(user, catalog, context),
-        lambda: session_based.generate(user, catalog),
-        lambda: business_rules.generate(user, catalog),
-        lambda: diversity.generate(user, catalog, random_seed=7),
-    ]
+    jobs = {
+        "content_based": lambda: content_based.generate(user, catalog),
+        "collaborative": lambda: collaborative.generate(user, catalog, similarity_table=similarity_table),
+        "demographic": lambda: demographic.generate(user, catalog),
+        "trending": lambda: trending.generate(user, catalog),
+        "context_aware": lambda: context_aware.generate(user, catalog, context),
+        "session_based": lambda: session_based.generate(user, catalog),
+        "business_rules": lambda: business_rules.generate(user, catalog),
+        "diversity": lambda: diversity.generate(user, catalog, random_seed=7),
+    }
 
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        results = list(pool.map(lambda job: job(), jobs))
+    return {name: job() for name, job in jobs.items()}
 
-    shortlist = merge(results)
 
-    # If the eight generators together could not even reach the minimum
-    # shortlist size, that is worth knowing about, it usually means this
-    # user has too little history or too small a catalog for stage one
-    # to do its job properly, not something stage two can fix.
+def trim_shortlist(shortlist):
+    """
+    Cuts the cleaned up list to the maximum size stage 2 should score. This
+    runs AFTER the exclusion filter on purpose. If it ran before, titles the
+    filter later removes would have taken up places that other titles should
+    have had.
+    """
+    return shortlist[:STAGE1_SHORTLIST_MAX_SIZE]
+
+
+def warn_if_shortlist_too_small(user, shortlist):
+    """
+    If the generators together could not reach the minimum shortlist size
+    even after cleanup, that is worth knowing about. It usually means this
+    user has too little history or too small a catalog for stage one to do
+    its job properly, not something stage two can fix.
+    """
     if len(shortlist) < STAGE1_SHORTLIST_MIN_SIZE:
         print(
             f"  note: stage 1 only produced {len(shortlist)} candidates for "
             f"{user['name']}, below the target minimum of {STAGE1_SHORTLIST_MIN_SIZE}."
         )
 
-    return shortlist
 
-
-def build_dislike_scores(user, catalog):
+def build_dislike_scores(user, catalog, as_of=None):
     """
     Walks this user's watch history once and builds up a dislike score
     per genre using the decay formula, simulating what would normally
     be an incremental background job updating these scores a little bit
     at a time as events happen, instead of recomputing from scratch on
     every single request.
+
+    as_of is the moment the scores are read, today by default. Tests pass
+    a fixed date so they never depend on the clock. Every score is decayed
+    up to as_of at the end, so an old dislike fades even when no newer
+    event touched that genre.
     """
+    as_of = as_of or datetime.now()
     dislike_scores = {}
     last_updated = {}
 
     for entry in sorted(user["watch_history"], key=lambda e: e["timestamp"]):
-        if entry["completion_pct"] >= 0.5:
-            continue  # not a dislike style signal
+        # Only an early exit is a dislike signal. Stopping midway can have
+        # many reasons (fell asleep, got busy), so a neutral or liked watch
+        # creates no dislike score at all, see config/weights.py.
+        if entry["completion_pct"] >= DISLIKE_SIGNAL_MAX_COMPLETION:
+            continue
 
         movie = catalog.get(entry["movie_id"])
         if not movie:
@@ -114,26 +143,47 @@ def build_dislike_scores(user, catalog):
 
     # Genres the user has openly said they dislike, like a thumbs down on
     # a whole genre. Same decay formula, just the strongest signal type.
-    now = datetime.now()
+    # The thumbs down counts as happening at as_of, so it has full strength.
     for genre in user.get("disliked_genres", []):
         new_score, new_timestamp = update_dislike_score(
             old_score=dislike_scores.get(genre, 0.0),
-            old_score_timestamp=last_updated.get(genre, now),
+            old_score_timestamp=last_updated.get(genre, as_of),
             event_type="explicit_thumbs_down",
-            event_timestamp=now,
+            event_timestamp=as_of,
         )
         dislike_scores[genre] = new_score
         last_updated[genre] = new_timestamp
 
-    return dislike_scores
+    # Fade every score from its last update up to as_of. Without this, a
+    # score only decays when the next event for that genre arrives.
+    return {
+        genre: decay_to(score, last_updated[genre], as_of)
+        for genre, score in dislike_scores.items()
+    }
+
+
+def run_pipeline_stages(user, catalog, context, as_of=None, similarity_table=None):
+    """
+    The whole pipeline, in order: generators, merge, exclusion filter, trim,
+    then stage 2 ranking. Returns every stage's output so the evaluation can
+    look inside, and so there is only one copy of this order in the project.
+
+    as_of is the moment dislike scores are read (today by default).
+    similarity_table is an optional collaborative table, see run_generators.
+    """
+    generator_results = run_generators(user, catalog, context, similarity_table)
+    merged = merge(list(generator_results.values()))
+    cleaned = exclude(merged, user, catalog)
+    shortlist = trim_shortlist(cleaned)
+    dislike_scores = build_dislike_scores(user, catalog, as_of)
+    ranked = rank_candidates(user, catalog, shortlist, context, dislike_scores)
+    return {"generator_results": generator_results, "shortlist": shortlist, "ranked": ranked}
 
 
 def run_pipeline_for_user(user, catalog, context):
-    shortlist = run_stage1(user, catalog, context)
-    cleaned_shortlist = exclude(shortlist, user, catalog)
-    dislike_scores = build_dislike_scores(user, catalog)
-    ranked = rank_candidates(user, catalog, cleaned_shortlist, context, dislike_scores)
-    return ranked
+    stages = run_pipeline_stages(user, catalog, context)
+    warn_if_shortlist_too_small(user, stages["shortlist"])
+    return stages["ranked"]
 
 
 def print_results(user, ranked):

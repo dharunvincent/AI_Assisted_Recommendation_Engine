@@ -15,10 +15,12 @@ from datetime import datetime, timedelta
 
 from src.user_profile.taste_score import decay_factor, update_dislike_score
 from src.stage1_candidate_generation.merge_shortlist import merge
+from src.stage1_candidate_generation.collaborative import build_similarity_table
 from src.exclusion_filter.exclude import exclude
 from src.stage1_candidate_generation.content_based import generate as generate_content_based
 from src.pipeline import build_dislike_scores
-from config.weights import MIN_RATINGS_FOR_QUALITY_FLOOR, SIGNAL_HALF_LIFE_DAYS
+from src.stage1_candidate_generation.business_rules import validate_promoted_content
+from config.weights import STAGE1_SHORTLIST_MAX_SIZE, BUSINESS_WEIGHT_MAX_PROMOTION, BUSINESS_WEIGHT_NEUTRAL, MIN_RATINGS_FOR_QUALITY_FLOOR, SIGNAL_HALF_LIFE_DAYS
 
 
 class TestDecayFormula(unittest.TestCase):
@@ -51,6 +53,66 @@ class TestMergeShortlist(unittest.TestCase):
         self.assertEqual(len(merged), 1)
         self.assertIn("content_based", merged[0]["sources"])
         self.assertIn("trending", merged[0]["sources"])
+
+
+class TestMergeOrdering(unittest.TestCase):
+    @staticmethod
+    def candidate(movie_id, source):
+        return {"movie_id": movie_id, "source": source, "reason": "test"}
+
+    def test_ties_go_to_each_generators_strongest_picks(self):
+        # Every title has one source. Z is the second generator's top pick,
+        # Y only the first generator's second pick, so Z must beat Y even
+        # though the first generator ran first.
+        first = [self.candidate("X", "a"), self.candidate("Y", "a")]
+        second = [self.candidate("Z", "b")]
+        order = [c["movie_id"] for c in merge([first, second])]
+        self.assertEqual(order, ["X", "Z", "Y"])
+
+    def test_more_sources_beats_a_better_position(self):
+        first = [self.candidate("X", "a"), self.candidate("Y", "a")]
+        second = [self.candidate("Z", "b"), self.candidate("Y", "b")]
+        order = [c["movie_id"] for c in merge([first, second])]
+        self.assertEqual(order[0], "Y")
+
+    def test_merge_does_not_trim_the_list(self):
+        many = [self.candidate(number, "a") for number in range(STAGE1_SHORTLIST_MAX_SIZE + 10)]
+        self.assertEqual(len(merge([many])), STAGE1_SHORTLIST_MAX_SIZE + 10)
+
+
+class TestCollaborativeSimilarity(unittest.TestCase):
+    LIKED, NICHE, BLOCKBUSTER = 1, 2, 3
+
+    def tiny_ratings(self):
+        # Users 1 to 10 liked the movie our user liked. Four of them also
+        # liked the niche movie. All ten also liked the blockbuster, and so
+        # did 90 other users who have nothing to do with our movie.
+        rows = []
+        for user_id in range(1, 11):
+            rows.append((user_id, self.LIKED, 5.0))
+            rows.append((user_id, self.BLOCKBUSTER, 5.0))
+        for user_id in range(1, 5):
+            rows.append((user_id, self.NICHE, 5.0))
+        for user_id in range(11, 101):
+            rows.append((user_id, self.BLOCKBUSTER, 5.0))
+        return rows
+
+    def test_niche_but_strongly_linked_movie_beats_a_blockbuster(self):
+        table = build_similarity_table(self.tiny_ratings())
+        linked_to_liked = table[self.LIKED]
+        # Raw counts would pick the blockbuster, 10 shared fans against 4.
+        self.assertGreater(10, 4)
+        self.assertGreater(linked_to_liked[self.NICHE], linked_to_liked[self.BLOCKBUSTER])
+
+    def test_pairs_with_too_few_shared_users_are_ignored(self):
+        rows = [(1, 10, 5.0), (1, 11, 5.0), (2, 10, 5.0), (2, 11, 5.0)]  # only 2 shared users
+        self.assertEqual(build_similarity_table(rows).get(10, {}), {})
+
+    def test_excluded_ratings_are_left_out_of_the_table(self):
+        rows = [(user_id, movie_id, 5.0) for user_id in (1, 2, 3) for movie_id in (10, 11)]
+        self.assertIn(11, build_similarity_table(rows)[10])
+        without_one_rating = build_similarity_table(rows, excluded_pairs={(1, 11)})
+        self.assertEqual(without_one_rating.get(10, {}), {})  # only 2 shared users left
 
 
 class TestQualityFloor(unittest.TestCase):
@@ -107,6 +169,50 @@ class TestContentBasedSpread(unittest.TestCase):
         self.assertIn(100, picked_ids)
         self.assertNotIn(101, picked_ids)  # too few ratings to qualify
         self.assertEqual(len(picked_ids), len(set(picked_ids)))  # no duplicates
+
+
+class TestLikedNeutralDisliked(unittest.TestCase):
+    """Leaving early is a dislike, stopping midway is neutral and creates no dislike."""
+
+    def dislike_scores_for_completion(self, completion_pct):
+        catalog = {1: {"genres": ["Drama"]}}
+        entry = {"movie_id": 1, "completion_pct": completion_pct, "timestamp": datetime.now()}
+        return build_dislike_scores({"watch_history": [entry]}, catalog)
+
+    def test_midway_stop_creates_no_dislike_score(self):
+        self.assertEqual(self.dislike_scores_for_completion(0.4), {})
+
+    def test_early_exit_creates_a_dislike_score(self):
+        self.assertGreater(self.dislike_scores_for_completion(0.1)["Drama"], 0.0)
+
+
+class TestDislikeDecaysUpToToday(unittest.TestCase):
+    AS_OF = datetime(2026, 1, 1)  # fixed, so these tests never depend on the clock
+
+    def test_old_early_drop_off_has_faded_away(self):
+        catalog = {1: {"genres": ["Drama"]}}
+        year_ago = self.AS_OF - timedelta(days=365)
+        entry = {"movie_id": 1, "completion_pct": 0.05, "timestamp": year_ago}
+        scores = build_dislike_scores({"watch_history": [entry]}, catalog, as_of=self.AS_OF)
+        self.assertLess(scores["Drama"], 0.1)
+
+    def test_thumbs_down_today_keeps_full_strength(self):
+        user = {"watch_history": [], "disliked_genres": ["Animation"]}
+        scores = build_dislike_scores(user, catalog={}, as_of=self.AS_OF)
+        self.assertAlmostEqual(scores["Animation"], 1.0, places=3)
+
+
+class TestPromotedWeights(unittest.TestCase):
+    def test_negative_weight_is_rejected(self):
+        with self.assertRaises(ValueError):
+            validate_promoted_content({1: -0.1})
+
+    def test_weight_above_the_maximum_promotion_is_rejected(self):
+        with self.assertRaises(ValueError):
+            validate_promoted_content({1: BUSINESS_WEIGHT_MAX_PROMOTION + 0.1})
+
+    def test_weights_from_neutral_up_to_the_maximum_are_accepted(self):
+        validate_promoted_content({1: BUSINESS_WEIGHT_NEUTRAL, 2: BUSINESS_WEIGHT_MAX_PROMOTION})
 
 
 class TestExplicitGenreDislike(unittest.TestCase):

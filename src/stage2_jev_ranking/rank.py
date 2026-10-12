@@ -24,13 +24,18 @@ from config.weights import (
     CONTEXT_FIT_WEIGHT,
     BUSINESS_WEIGHT_WEIGHT,
     BADGE_DISPLAY_THRESHOLD_PERCENT,
+    BUSINESS_WEIGHT_NEUTRAL,
+    LIKED_COMPLETION_THRESHOLD,
+    DISLIKE_PENALTY_SCALE,
+    OVERRIDE_CONFIDENCE_THRESHOLD,
+    OVERRIDE_PENALTY_RETAINED,
 )
 
 
 def _genre_overlap_count(user, catalog, movie):
     liked_genres = set()
     for entry in user["watch_history"]:
-        if entry["completion_pct"] >= 0.5:
+        if entry["completion_pct"] >= LIKED_COMPLETION_THRESHOLD:
             liked_movie = catalog.get(entry["movie_id"])
             if liked_movie:
                 liked_genres.update(liked_movie["genres"])
@@ -63,6 +68,10 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
         questions = scoring_questions.build_questions(movie, candidate, dislike_penalty, genre_overlap_count)
         jev_answers = jev_client.ask(state, questions)
 
+        # The taste fit question is asked "ignoring any general dislike", so
+        # this is a before penalty score. The dislike penalty is applied
+        # below, and ONLY there. Nowhere else in stage 2 subtracts it, so it
+        # can never be counted twice.
         taste_fit_score = jev_answers["taste_fit"]["answer"]
 
         # Dislike override logic, if JEV's override question comes back
@@ -75,16 +84,18 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
         override_used = False
 
         if dislike_penalty > 0:
-            if override_answer == "override_show_anyway" and override_confidence >= 0.65:
-                effective_penalty = dislike_penalty * 0.25  # mostly overruled
+            if override_answer == "override_show_anyway" and override_confidence >= OVERRIDE_CONFIDENCE_THRESHOLD:
+                effective_penalty = dislike_penalty * OVERRIDE_PENALTY_RETAINED  # mostly overruled
                 override_used = True
             else:
                 effective_penalty = dislike_penalty  # penalty stands
-            taste_fit_score = max(0.0, taste_fit_score - (effective_penalty * 0.3))
+            taste_fit_score = max(0.0, taste_fit_score - (effective_penalty * DISLIKE_PENALTY_SCALE))
 
         completion_score = jev_answers["completion_likelihood"]["answer"]
         context_score = jev_answers["context_fit"]["answer"]
-        business_score = candidate.get("business_weight", 0.0)
+        # A title nobody promoted has no business weight and adds nothing.
+        # Promotion is a small nudge, worth at most 7.5 extra points.
+        business_score = candidate.get("business_weight", BUSINESS_WEIGHT_NEUTRAL)
 
         final_score = (
             taste_fit_score * TASTE_FIT_WEIGHT

@@ -28,7 +28,7 @@ filled by taking one title from each list in turn.
 
 from collections import Counter
 
-from config.weights import MIN_RATINGS_FOR_CONTENT_BASED
+from config.weights import MIN_RATINGS_FOR_CONTENT_BASED, LIKED_COMPLETION_THRESHOLD
 
 
 def generate(user, catalog, max_candidates=15):
@@ -107,7 +107,7 @@ def _pick_by_inferred_genres(user, watched_ids, catalog, max_candidates):
     """
     genre_counter = Counter()
     for entry in user["watch_history"]:
-        if entry["completion_pct"] >= 0.5:
+        if entry["completion_pct"] >= LIKED_COMPLETION_THRESHOLD:
             movie = catalog.get(entry["movie_id"])
             if movie:
                 genre_counter.update(movie["genres"])

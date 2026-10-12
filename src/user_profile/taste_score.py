@@ -27,6 +27,8 @@ from config.weights import (
     SIGNAL_WEIGHT_HOVER_AND_SKIP,
     EARLY_DROP_OFF_CUTOFF,
     LATE_DROP_OFF_CUTOFF,
+    SIGNAL_WEIGHT_DROP_OFF_MIDDLE_FACTOR,
+    DISLIKE_SCORE_CAP,
 )
 
 
@@ -37,6 +39,18 @@ def decay_factor(days_elapsed):
     lives, a quarter, and so on.
     """
     return math.pow(0.5, days_elapsed / SIGNAL_HALF_LIFE_DAYS)
+
+
+def decay_to(score, last_updated, as_of):
+    """
+    Returns what a stored score is worth at the moment as_of, given that it
+    was last updated at last_updated. update_dislike_score only decays a
+    score when a NEW event arrives, so a dislike from a year ago with no
+    newer event would otherwise keep its full strength forever. Calling this
+    once at read time makes old signals fade even when nothing new happened.
+    """
+    days_elapsed = max((as_of - last_updated).days, 0)
+    return score * decay_factor(days_elapsed)
 
 
 def signal_weight_for_event(event_type, completion_pct=None):
@@ -56,8 +70,11 @@ def signal_weight_for_event(event_type, completion_pct=None):
             return SIGNAL_WEIGHT_DROP_OFF_EARLY
         if completion_pct >= LATE_DROP_OFF_CUTOFF:
             return SIGNAL_WEIGHT_DROP_OFF_LATE
-        # Dropped off somewhere in the middle, counted as a weaker, partial signal.
-        return SIGNAL_WEIGHT_DROP_OFF_EARLY * 0.5
+        # Dropped off after the early cutoff, counted as a weaker, partial
+        # signal. The pipeline only sends drop offs below
+        # DISLIKE_SIGNAL_MAX_COMPLETION, so in practice this covers the
+        # narrow band between the early cutoff and that line.
+        return SIGNAL_WEIGHT_DROP_OFF_EARLY * SIGNAL_WEIGHT_DROP_OFF_MIDDLE_FACTOR
 
     if event_type == "watchlist_neglect":
         return SIGNAL_WEIGHT_WATCHLIST_NEGLECT
@@ -90,6 +107,6 @@ def update_dislike_score(old_score, old_score_timestamp, event_type, event_times
 
     # Cap at a sane maximum so repeated signals cannot make the dislike
     # score grow without any limit.
-    new_score = min(new_score, 3.0)
+    new_score = min(new_score, DISLIKE_SCORE_CAP)
 
     return new_score, event_timestamp

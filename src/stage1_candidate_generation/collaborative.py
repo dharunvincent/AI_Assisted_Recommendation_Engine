@@ -15,70 +15,117 @@ This generator does not use our synthetic user's own history the way
 content based filtering does, it uses the pattern of hundreds of other
 real people to find connections our one user's history alone cannot see.
 
+How two movies are scored, in plain English (cosine similarity):
+Count how many users rated movie A highly, how many rated movie B highly,
+and how many rated BOTH highly. The link between A and B is
+
+    users who liked both / square root of (users who liked A x users who liked B)
+
+This is a fraction between 0 and 1. It fixes a problem with raw counts.
+A blockbuster that half of all users liked shares fans with almost every
+movie, so with raw counts it wins for everyone. With this formula, a
+blockbuster only scores high next to a movie if its fans overlap with that
+movie's fans MORE than chance would suggest. A small, niche movie whose
+fans nearly all also liked movie A scores higher than a blockbuster that
+only a small part of A's fans liked. Pairs shared by fewer than
+COLLAB_MIN_CO_OCCURRENCE users are ignored, because tiny counts are noise.
+
 Honesty note on scale: for a dataset this small (about 100000 ratings)
-building the full co occurrence table on the fly like this is fine. A
-real platform with millions of users and titles would need a smarter
-approach, such as matrix factorization or an approximate nearest
-neighbour search, instead of this simple full comparison.
+building the full table on the fly like this is fine. A real platform
+with millions of users and titles would need a smarter approach, such as
+matrix factorization or an approximate nearest neighbour search, instead
+of this simple full comparison.
 """
 
 import csv
+import math
 import os
 from collections import defaultdict, Counter
 
+from config.weights import (
+    LIKED_COMPLETION_THRESHOLD,
+    COLLAB_HIGH_RATING_THRESHOLD,
+    COLLAB_MIN_CO_OCCURRENCE,
+)
+
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "ml-latest-small")
 
-_co_occurrence_cache = None
+_similarity_cache = {}  # one finished table per set of excluded ratings
 
 
-def _build_co_occurrence():
+def build_similarity_table(rating_rows, excluded_pairs=frozenset()):
     """
-    Builds a lookup table, for every movie, which other movies did the
-    same real users also rate 4 stars or higher. Built once and cached
-    in memory because ratings.csv does not change between runs.
-    """
-    global _co_occurrence_cache
-    if _co_occurrence_cache is not None:
-        return _co_occurrence_cache
+    rating_rows: an iterable of (user_id, movie_id, rating).
+    excluded_pairs: (user_id, movie_id) ratings to leave out completely.
+    The evaluation uses this to keep held out ratings out of the table, so
+    the model never sees the answers it is tested on.
 
-    ratings_path = os.path.join(DATA_FOLDER, "ratings.csv")
+    Returns a dict: movie_id mapped to {other_movie_id: similarity}, where
+    similarity is the cosine similarity described at the top of this file.
+    """
+    # 1. For every user, the set of movies they rated highly.
     user_high_ratings = defaultdict(set)
+    for user_id, movie_id, rating in rating_rows:
+        if rating >= COLLAB_HIGH_RATING_THRESHOLD and (user_id, movie_id) not in excluded_pairs:
+            user_high_ratings[user_id].add(movie_id)
 
-    if not os.path.exists(ratings_path):
-        _co_occurrence_cache = {}
-        return _co_occurrence_cache
-
-    with open(ratings_path, encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            if float(row["rating"]) >= 4.0:
-                user_high_ratings[row["userId"]].add(int(row["movieId"]))
-
-    co_occurrence = defaultdict(Counter)
+    # 2. How many users rated each movie highly, and how many rated each
+    # pair of movies highly together.
+    fans_of = Counter()
+    fans_of_both = defaultdict(Counter)
     for movie_set in user_high_ratings.values():
         movie_list = list(movie_set)
+        fans_of.update(movie_list)
         for i, movie_a in enumerate(movie_list):
             for movie_b in movie_list[i + 1:]:
-                co_occurrence[movie_a][movie_b] += 1
-                co_occurrence[movie_b][movie_a] += 1
+                fans_of_both[movie_a][movie_b] += 1
+                fans_of_both[movie_b][movie_a] += 1
 
-    _co_occurrence_cache = co_occurrence
-    return co_occurrence
+    # 3. Turn the counts into cosine similarity, dropping noisy pairs.
+    similarity = {}
+    for movie_a, partners in fans_of_both.items():
+        similarity[movie_a] = {
+            movie_b: shared / math.sqrt(fans_of[movie_a] * fans_of[movie_b])
+            for movie_b, shared in partners.items()
+            if shared >= COLLAB_MIN_CO_OCCURRENCE
+        }
+    return similarity
 
 
-def generate(user, catalog, max_candidates=15):
-    co_occurrence = _build_co_occurrence()
+def _read_rating_rows():
+    ratings_path = os.path.join(DATA_FOLDER, "ratings.csv")
+    if not os.path.exists(ratings_path):
+        return
+    with open(ratings_path, encoding="utf-8") as file:
+        for row in csv.DictReader(file):
+            yield int(row["userId"]), int(row["movieId"]), float(row["rating"])
+
+
+def get_similarity_table(excluded_pairs=frozenset()):
+    """
+    The table for the real ratings file, built once per set of excluded
+    ratings and kept in memory, because ratings.csv does not change.
+    """
+    key = frozenset(excluded_pairs)
+    if key not in _similarity_cache:
+        _similarity_cache[key] = build_similarity_table(_read_rating_rows(), key)
+    return _similarity_cache[key]
+
+
+def generate(user, catalog, max_candidates=15, similarity_table=None):
+    if similarity_table is None:
+        similarity_table = get_similarity_table()
     watched_ids = {entry["movie_id"] for entry in user["watch_history"]}
-    liked_ids = [entry["movie_id"] for entry in user["watch_history"] if entry["completion_pct"] >= 0.7]
+    liked_ids = [entry["movie_id"] for entry in user["watch_history"] if entry["completion_pct"] >= LIKED_COMPLETION_THRESHOLD]
 
     score_board = Counter()
     for liked_id in liked_ids:
-        for related_id, strength in co_occurrence.get(liked_id, {}).items():
+        for related_id, similarity in similarity_table.get(liked_id, {}).items():
             if related_id not in watched_ids:
-                score_board[related_id] += strength
+                score_board[related_id] += similarity
 
     candidates = []
-    for movie_id, strength in score_board.most_common(max_candidates):
+    for movie_id, similarity in score_board.most_common(max_candidates):
         if movie_id not in catalog:
             continue
         candidates.append({
