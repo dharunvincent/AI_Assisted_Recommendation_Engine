@@ -42,6 +42,7 @@ from src.stage1_candidate_generation import (
 from src.stage1_candidate_generation.merge_shortlist import merge
 from config.weights import (
     STAGE1_SHORTLIST_MIN_SIZE,
+    STAGE1_SHORTLIST_MAX_SIZE,
     DISLIKE_SIGNAL_MAX_COMPLETION,
 )
 
@@ -66,19 +67,31 @@ def run_stage1(user, catalog, context):
     with ThreadPoolExecutor(max_workers=8) as pool:
         results = list(pool.map(lambda job: job(), jobs))
 
-    shortlist = merge(results)
+    return merge(results)
 
-    # If the eight generators together could not even reach the minimum
-    # shortlist size, that is worth knowing about, it usually means this
-    # user has too little history or too small a catalog for stage one
-    # to do its job properly, not something stage two can fix.
+
+def trim_shortlist(shortlist):
+    """
+    Cuts the cleaned up list to the maximum size stage 2 should score. This
+    runs AFTER the exclusion filter on purpose. If it ran before, titles the
+    filter later removes would have taken up places that other titles should
+    have had.
+    """
+    return shortlist[:STAGE1_SHORTLIST_MAX_SIZE]
+
+
+def warn_if_shortlist_too_small(user, shortlist):
+    """
+    If the generators together could not reach the minimum shortlist size
+    even after cleanup, that is worth knowing about. It usually means this
+    user has too little history or too small a catalog for stage one to do
+    its job properly, not something stage two can fix.
+    """
     if len(shortlist) < STAGE1_SHORTLIST_MIN_SIZE:
         print(
             f"  note: stage 1 only produced {len(shortlist)} candidates for "
             f"{user['name']}, below the target minimum of {STAGE1_SHORTLIST_MIN_SIZE}."
         )
-
-    return shortlist
 
 
 def build_dislike_scores(user, catalog, as_of=None):
@@ -146,8 +159,10 @@ def build_dislike_scores(user, catalog, as_of=None):
 
 
 def run_pipeline_for_user(user, catalog, context):
-    shortlist = run_stage1(user, catalog, context)
-    cleaned_shortlist = exclude(shortlist, user, catalog)
+    merged = run_stage1(user, catalog, context)
+    cleaned = exclude(merged, user, catalog)
+    cleaned_shortlist = trim_shortlist(cleaned)
+    warn_if_shortlist_too_small(user, cleaned_shortlist)
     dislike_scores = build_dislike_scores(user, catalog)
     ranked = rank_candidates(user, catalog, cleaned_shortlist, context, dislike_scores)
     return ranked

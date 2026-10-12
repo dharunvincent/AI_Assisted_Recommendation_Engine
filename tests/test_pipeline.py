@@ -19,7 +19,7 @@ from src.exclusion_filter.exclude import exclude
 from src.stage1_candidate_generation.content_based import generate as generate_content_based
 from src.pipeline import build_dislike_scores
 from src.stage1_candidate_generation.business_rules import validate_promoted_content
-from config.weights import BUSINESS_WEIGHT_MAX_PROMOTION, BUSINESS_WEIGHT_NEUTRAL, MIN_RATINGS_FOR_QUALITY_FLOOR, SIGNAL_HALF_LIFE_DAYS
+from config.weights import STAGE1_SHORTLIST_MAX_SIZE, BUSINESS_WEIGHT_MAX_PROMOTION, BUSINESS_WEIGHT_NEUTRAL, MIN_RATINGS_FOR_QUALITY_FLOOR, SIGNAL_HALF_LIFE_DAYS
 
 
 class TestDecayFormula(unittest.TestCase):
@@ -52,6 +52,31 @@ class TestMergeShortlist(unittest.TestCase):
         self.assertEqual(len(merged), 1)
         self.assertIn("content_based", merged[0]["sources"])
         self.assertIn("trending", merged[0]["sources"])
+
+
+class TestMergeOrdering(unittest.TestCase):
+    @staticmethod
+    def candidate(movie_id, source):
+        return {"movie_id": movie_id, "source": source, "reason": "test"}
+
+    def test_ties_go_to_each_generators_strongest_picks(self):
+        # Every title has one source. Z is the second generator's top pick,
+        # Y only the first generator's second pick, so Z must beat Y even
+        # though the first generator ran first.
+        first = [self.candidate("X", "a"), self.candidate("Y", "a")]
+        second = [self.candidate("Z", "b")]
+        order = [c["movie_id"] for c in merge([first, second])]
+        self.assertEqual(order, ["X", "Z", "Y"])
+
+    def test_more_sources_beats_a_better_position(self):
+        first = [self.candidate("X", "a"), self.candidate("Y", "a")]
+        second = [self.candidate("Z", "b"), self.candidate("Y", "b")]
+        order = [c["movie_id"] for c in merge([first, second])]
+        self.assertEqual(order[0], "Y")
+
+    def test_merge_does_not_trim_the_list(self):
+        many = [self.candidate(number, "a") for number in range(STAGE1_SHORTLIST_MAX_SIZE + 10)]
+        self.assertEqual(len(merge([many])), STAGE1_SHORTLIST_MAX_SIZE + 10)
 
 
 class TestQualityFloor(unittest.TestCase):
