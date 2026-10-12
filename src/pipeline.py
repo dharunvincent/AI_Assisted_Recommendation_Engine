@@ -46,9 +46,12 @@ from config.weights import (
 )
 
 
-def run_stage1(user, catalog, context):
+def run_generators(user, catalog, context, similarity_table=None):
     """
-    Runs all eight generators one after another and merges their output.
+    Runs all eight generators one after another. Returns a dict of generator
+    name mapped to that generator's own candidate list, in running order.
+    similarity_table lets the evaluation hand collaborative filtering a table
+    that was built without the held out ratings, see src/evaluate.py.
 
     In a real platform each generator would be its own service, called in
     parallel over the network, and parallel calls really do save time there
@@ -57,20 +60,18 @@ def run_stage1(user, catalog, context):
     (Python lets only one thread run Python code at a time). A plain loop is
     simpler and gives exactly the same answers.
     """
-    jobs = [
-        lambda: content_based.generate(user, catalog),
-        lambda: collaborative.generate(user, catalog),
-        lambda: demographic.generate(user, catalog),
-        lambda: trending.generate(user, catalog),
-        lambda: context_aware.generate(user, catalog, context),
-        lambda: session_based.generate(user, catalog),
-        lambda: business_rules.generate(user, catalog),
-        lambda: diversity.generate(user, catalog, random_seed=7),
-    ]
+    jobs = {
+        "content_based": lambda: content_based.generate(user, catalog),
+        "collaborative": lambda: collaborative.generate(user, catalog, similarity_table=similarity_table),
+        "demographic": lambda: demographic.generate(user, catalog),
+        "trending": lambda: trending.generate(user, catalog),
+        "context_aware": lambda: context_aware.generate(user, catalog, context),
+        "session_based": lambda: session_based.generate(user, catalog),
+        "business_rules": lambda: business_rules.generate(user, catalog),
+        "diversity": lambda: diversity.generate(user, catalog, random_seed=7),
+    }
 
-    results = [job() for job in jobs]
-
-    return merge(results)
+    return {name: job() for name, job in jobs.items()}
 
 
 def trim_shortlist(shortlist):
@@ -161,14 +162,28 @@ def build_dislike_scores(user, catalog, as_of=None):
     }
 
 
-def run_pipeline_for_user(user, catalog, context):
-    merged = run_stage1(user, catalog, context)
+def run_pipeline_stages(user, catalog, context, as_of=None, similarity_table=None):
+    """
+    The whole pipeline, in order: generators, merge, exclusion filter, trim,
+    then stage 2 ranking. Returns every stage's output so the evaluation can
+    look inside, and so there is only one copy of this order in the project.
+
+    as_of is the moment dislike scores are read (today by default).
+    similarity_table is an optional collaborative table, see run_generators.
+    """
+    generator_results = run_generators(user, catalog, context, similarity_table)
+    merged = merge(list(generator_results.values()))
     cleaned = exclude(merged, user, catalog)
-    cleaned_shortlist = trim_shortlist(cleaned)
-    warn_if_shortlist_too_small(user, cleaned_shortlist)
-    dislike_scores = build_dislike_scores(user, catalog)
-    ranked = rank_candidates(user, catalog, cleaned_shortlist, context, dislike_scores)
-    return ranked
+    shortlist = trim_shortlist(cleaned)
+    dislike_scores = build_dislike_scores(user, catalog, as_of)
+    ranked = rank_candidates(user, catalog, shortlist, context, dislike_scores)
+    return {"generator_results": generator_results, "shortlist": shortlist, "ranked": ranked}
+
+
+def run_pipeline_for_user(user, catalog, context):
+    stages = run_pipeline_stages(user, catalog, context)
+    warn_if_shortlist_too_small(user, stages["shortlist"])
+    return stages["ranked"]
 
 
 def print_results(user, ranked):
