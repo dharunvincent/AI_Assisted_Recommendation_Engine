@@ -377,6 +377,10 @@ check that counts how many animated titles reached the top 15.
   Arjun.
 - **Good next step.** Reserve a slot in the top list for a liked genre
   that is under represented.
+- **Promotion is a small score nudge.** Real platforms often show
+  promoted titles in their own row or a reserved slot instead of boosting
+  their score. This project uses a small score nudge to keep things
+  simple.
 - **Genre dislikes are a soft penalty.** A strong animated title can
   still appear in the list.
 - **Dropped titles taint all their genres.** When a watched title is

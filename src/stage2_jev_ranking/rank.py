@@ -24,6 +24,7 @@ from config.weights import (
     CONTEXT_FIT_WEIGHT,
     BUSINESS_WEIGHT_WEIGHT,
     BADGE_DISPLAY_THRESHOLD_PERCENT,
+    BUSINESS_WEIGHT_NEUTRAL,
     LIKED_COMPLETION_THRESHOLD,
     DISLIKE_PENALTY_SCALE,
     OVERRIDE_CONFIDENCE_THRESHOLD,
@@ -92,7 +93,9 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
 
         completion_score = jev_answers["completion_likelihood"]["answer"]
         context_score = jev_answers["context_fit"]["answer"]
-        business_score = candidate.get("business_weight", 0.0)
+        # A title nobody promoted sits at the neutral weight, not at zero, so
+        # promotion is a nudge above neutral instead of a head start.
+        business_score = candidate.get("business_weight", BUSINESS_WEIGHT_NEUTRAL)
 
         final_score = (
             taste_fit_score * TASTE_FIT_WEIGHT

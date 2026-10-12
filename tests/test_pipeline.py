@@ -18,7 +18,8 @@ from src.stage1_candidate_generation.merge_shortlist import merge
 from src.exclusion_filter.exclude import exclude
 from src.stage1_candidate_generation.content_based import generate as generate_content_based
 from src.pipeline import build_dislike_scores
-from config.weights import MIN_RATINGS_FOR_QUALITY_FLOOR, SIGNAL_HALF_LIFE_DAYS
+from src.stage1_candidate_generation.business_rules import validate_promoted_content
+from config.weights import BUSINESS_WEIGHT_NEUTRAL, MIN_RATINGS_FOR_QUALITY_FLOOR, SIGNAL_HALF_LIFE_DAYS
 
 
 class TestDecayFormula(unittest.TestCase):
@@ -138,6 +139,19 @@ class TestDislikeDecaysUpToToday(unittest.TestCase):
         user = {"watch_history": [], "disliked_genres": ["Animation"]}
         scores = build_dislike_scores(user, catalog={}, as_of=self.AS_OF)
         self.assertAlmostEqual(scores["Animation"], 1.0, places=3)
+
+
+class TestPromotedWeights(unittest.TestCase):
+    def test_weight_below_neutral_is_rejected(self):
+        with self.assertRaises(ValueError):
+            validate_promoted_content({1: 0.2})
+
+    def test_weight_above_one_is_rejected(self):
+        with self.assertRaises(ValueError):
+            validate_promoted_content({1: 1.2})
+
+    def test_weight_between_neutral_and_one_is_accepted(self):
+        validate_promoted_content({1: BUSINESS_WEIGHT_NEUTRAL, 2: 1.0})
 
 
 class TestExplicitGenreDislike(unittest.TestCase):

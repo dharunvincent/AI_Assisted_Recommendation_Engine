@@ -12,7 +12,7 @@ which is slower and costs more per call, never has to score more titles
 than it needs to.
 """
 
-from config.weights import STAGE1_SHORTLIST_MAX_SIZE
+from config.weights import STAGE1_SHORTLIST_MAX_SIZE, BUSINESS_WEIGHT_NEUTRAL
 
 
 def merge(generator_results):
@@ -30,13 +30,16 @@ def merge(generator_results):
                     "movie_id": movie_id,
                     "sources": [candidate["source"]],
                     "reasons": [candidate["reason"]],
-                    "business_weight": candidate.get("business_weight", 0.0),
+                    "business_weight": candidate.get("business_weight", BUSINESS_WEIGHT_NEUTRAL),
                 }
             else:
                 merged[movie_id]["sources"].append(candidate["source"])
                 merged[movie_id]["reasons"].append(candidate["reason"])
-                if candidate.get("business_weight", 0.0) > merged[movie_id]["business_weight"]:
-                    merged[movie_id]["business_weight"] = candidate["business_weight"]
+                # A title not promoted by this generator sits at the neutral
+                # weight, so a promotion from any generator can only raise it.
+                candidate_weight = candidate.get("business_weight", BUSINESS_WEIGHT_NEUTRAL)
+                if candidate_weight > merged[movie_id]["business_weight"]:
+                    merged[movie_id]["business_weight"] = candidate_weight
 
     # A movie suggested by more than one generator independently is
     # usually a stronger candidate, so we rank by how many generators

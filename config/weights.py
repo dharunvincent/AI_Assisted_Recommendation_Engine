@@ -155,3 +155,13 @@ OVERRIDE_MIN_GENRE_OVERLAP = 2
 COLLAB_HIGH_RATING_THRESHOLD = 4.0
 # Diversity injection only offers titles rated at least this well.
 DIVERSITY_MIN_AVG_RATING = 3.8
+
+# -----------------------------------------------------------------------
+# BUSINESS WEIGHT NEUTRAL POINT
+# A normal, non promoted title sits at the neutral middle, 0.5. Promotion is
+# then a nudge above neutral, not a 15 point gap over every other title.
+# Before this, non promoted titles got 0.0, which meant a promoted title
+# started with up to 13.5 free points over everything else, just for being
+# promoted. Promoted weights must be between this value and 1.0.
+# -----------------------------------------------------------------------
+BUSINESS_WEIGHT_NEUTRAL = 0.5
