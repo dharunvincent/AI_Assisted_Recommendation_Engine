@@ -59,10 +59,11 @@ def build_questions(movie, candidate, dislike_penalty, genre_overlap_count):
     jev_client.py for why the mock needs this hint.
     """
     # Rough expectation for taste fit, more genre overlap with things
-    # the user already liked pushes this up, an active dislike penalty
-    # pulls it back down. This is where the dislike override logic from
-    # the brainstorm lives, see rank.py for how the override is resolved.
-    taste_bias = TASTE_BIAS_BASE + (genre_overlap_count * TASTE_BIAS_PER_GENRE_OVERLAP) - (dislike_penalty * 0.25)
+    # the user already liked pushes this up. The dislike penalty is
+    # deliberately NOT part of this number. It is applied exactly once,
+    # in rank.py, so that the override logic can soften it cleanly. If it
+    # was also subtracted here, the override could never fully work.
+    taste_bias = TASTE_BIAS_BASE + (genre_overlap_count * TASTE_BIAS_PER_GENRE_OVERLAP)
 
     # Rough expectation for completion likelihood, a well regarded movie
     # in the real MovieLens data is a reasonable proxy for "most people
@@ -79,7 +80,8 @@ def build_questions(movie, candidate, dislike_penalty, genre_overlap_count):
 
     return {
         "taste_fit": Score(
-            "How well does this match this user's personal taste?",
+            "Ignoring any general dislike of this genre, how well does this "
+            "match this user's personal taste?",
             bias_hint=taste_bias,
         ),
         "completion_likelihood": Score(

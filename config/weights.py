@@ -116,8 +116,12 @@ DISLIKE_SCORE_CAP = 3.0
 # -----------------------------------------------------------------------
 # STAGE 2 DISLIKE PENALTY AND OVERRIDE
 # -----------------------------------------------------------------------
-# How strongly the dislike score pulls a title's taste fit down.
-DISLIKE_PENALTY_SCALE = 0.3
+# How strongly the dislike score pulls a title's taste fit down. The penalty
+# is now applied in one place only (rank.py). It used to be subtracted twice,
+# about 0.25 inside the taste expectation and 0.3 in rank.py, roughly 0.55 in
+# total. This single value keeps the total animation penalty about as strong
+# as before.
+DISLIKE_PENALTY_SCALE = 0.55
 # If the override question answers "show anyway" with at least this much
 # confidence, the penalty is mostly lifted for that one title.
 OVERRIDE_CONFIDENCE_THRESHOLD = 0.65

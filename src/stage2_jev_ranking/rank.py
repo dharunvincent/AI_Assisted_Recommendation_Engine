@@ -67,6 +67,10 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
         questions = scoring_questions.build_questions(movie, candidate, dislike_penalty, genre_overlap_count)
         jev_answers = jev_client.ask(state, questions)
 
+        # The taste fit question is asked "ignoring any general dislike", so
+        # this is a before penalty score. The dislike penalty is applied
+        # below, and ONLY there. Nowhere else in stage 2 subtracts it, so it
+        # can never be counted twice.
         taste_fit_score = jev_answers["taste_fit"]["answer"]
 
         # Dislike override logic, if JEV's override question comes back
