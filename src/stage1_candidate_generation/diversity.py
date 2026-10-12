@@ -17,6 +17,8 @@ over the recommendations.
 
 import random
 
+from config.weights import DIVERSITY_MIN_AVG_RATING
+
 
 def generate(user, catalog, max_candidates=5, random_seed=None):
     if random_seed is not None:
@@ -34,7 +36,7 @@ def generate(user, catalog, max_candidates=5, random_seed=None):
         movie for movie in catalog.values()
         if movie["movie_id"] not in watched_ids
         and movie["avg_rating"] is not None
-        and movie["avg_rating"] >= 3.8
+        and movie["avg_rating"] >= DIVERSITY_MIN_AVG_RATING
         and not set(movie["genres"]).intersection(watched_genres)
     ]
 

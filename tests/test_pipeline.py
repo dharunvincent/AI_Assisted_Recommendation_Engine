@@ -109,6 +109,21 @@ class TestContentBasedSpread(unittest.TestCase):
         self.assertEqual(len(picked_ids), len(set(picked_ids)))  # no duplicates
 
 
+class TestLikedNeutralDisliked(unittest.TestCase):
+    """Leaving early is a dislike, stopping midway is neutral and creates no dislike."""
+
+    def dislike_scores_for_completion(self, completion_pct):
+        catalog = {1: {"genres": ["Drama"]}}
+        entry = {"movie_id": 1, "completion_pct": completion_pct, "timestamp": datetime.now()}
+        return build_dislike_scores({"watch_history": [entry]}, catalog)
+
+    def test_midway_stop_creates_no_dislike_score(self):
+        self.assertEqual(self.dislike_scores_for_completion(0.4), {})
+
+    def test_early_exit_creates_a_dislike_score(self):
+        self.assertGreater(self.dislike_scores_for_completion(0.1)["Drama"], 0.0)
+
+
 class TestExplicitGenreDislike(unittest.TestCase):
     def test_disliked_genre_gets_a_full_strength_score(self):
         user = {"watch_history": [], "disliked_genres": ["Animation"]}

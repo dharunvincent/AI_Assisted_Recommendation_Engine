@@ -24,13 +24,17 @@ from config.weights import (
     CONTEXT_FIT_WEIGHT,
     BUSINESS_WEIGHT_WEIGHT,
     BADGE_DISPLAY_THRESHOLD_PERCENT,
+    LIKED_COMPLETION_THRESHOLD,
+    DISLIKE_PENALTY_SCALE,
+    OVERRIDE_CONFIDENCE_THRESHOLD,
+    OVERRIDE_PENALTY_RETAINED,
 )
 
 
 def _genre_overlap_count(user, catalog, movie):
     liked_genres = set()
     for entry in user["watch_history"]:
-        if entry["completion_pct"] >= 0.5:
+        if entry["completion_pct"] >= LIKED_COMPLETION_THRESHOLD:
             liked_movie = catalog.get(entry["movie_id"])
             if liked_movie:
                 liked_genres.update(liked_movie["genres"])
@@ -75,12 +79,12 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
         override_used = False
 
         if dislike_penalty > 0:
-            if override_answer == "override_show_anyway" and override_confidence >= 0.65:
-                effective_penalty = dislike_penalty * 0.25  # mostly overruled
+            if override_answer == "override_show_anyway" and override_confidence >= OVERRIDE_CONFIDENCE_THRESHOLD:
+                effective_penalty = dislike_penalty * OVERRIDE_PENALTY_RETAINED  # mostly overruled
                 override_used = True
             else:
                 effective_penalty = dislike_penalty  # penalty stands
-            taste_fit_score = max(0.0, taste_fit_score - (effective_penalty * 0.3))
+            taste_fit_score = max(0.0, taste_fit_score - (effective_penalty * DISLIKE_PENALTY_SCALE))
 
         completion_score = jev_answers["completion_likelihood"]["answer"]
         context_score = jev_answers["context_fit"]["answer"]

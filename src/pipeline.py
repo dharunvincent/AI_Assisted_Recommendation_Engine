@@ -40,7 +40,10 @@ from src.stage1_candidate_generation import (
     diversity,
 )
 from src.stage1_candidate_generation.merge_shortlist import merge
-from config.weights import STAGE1_SHORTLIST_MIN_SIZE
+from config.weights import (
+    STAGE1_SHORTLIST_MIN_SIZE,
+    DISLIKE_SIGNAL_MAX_COMPLETION,
+)
 
 
 def run_stage1(user, catalog, context):
@@ -90,8 +93,11 @@ def build_dislike_scores(user, catalog):
     last_updated = {}
 
     for entry in sorted(user["watch_history"], key=lambda e: e["timestamp"]):
-        if entry["completion_pct"] >= 0.5:
-            continue  # not a dislike style signal
+        # Only an early exit is a dislike signal. Stopping midway can have
+        # many reasons (fell asleep, got busy), so a neutral or liked watch
+        # creates no dislike score at all, see config/weights.py.
+        if entry["completion_pct"] >= DISLIKE_SIGNAL_MAX_COMPLETION:
+            continue
 
         movie = catalog.get(entry["movie_id"])
         if not movie:

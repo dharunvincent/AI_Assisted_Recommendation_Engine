@@ -26,6 +26,8 @@ import csv
 import os
 from collections import defaultdict, Counter
 
+from config.weights import LIKED_COMPLETION_THRESHOLD, COLLAB_HIGH_RATING_THRESHOLD
+
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "ml-latest-small")
 
 _co_occurrence_cache = None
@@ -51,7 +53,7 @@ def _build_co_occurrence():
     with open(ratings_path, encoding="utf-8") as file:
         reader = csv.DictReader(file)
         for row in reader:
-            if float(row["rating"]) >= 4.0:
+            if float(row["rating"]) >= COLLAB_HIGH_RATING_THRESHOLD:
                 user_high_ratings[row["userId"]].add(int(row["movieId"]))
 
     co_occurrence = defaultdict(Counter)
@@ -69,7 +71,7 @@ def _build_co_occurrence():
 def generate(user, catalog, max_candidates=15):
     co_occurrence = _build_co_occurrence()
     watched_ids = {entry["movie_id"] for entry in user["watch_history"]}
-    liked_ids = [entry["movie_id"] for entry in user["watch_history"] if entry["completion_pct"] >= 0.7]
+    liked_ids = [entry["movie_id"] for entry in user["watch_history"] if entry["completion_pct"] >= LIKED_COMPLETION_THRESHOLD]
 
     score_board = Counter()
     for liked_id in liked_ids:
