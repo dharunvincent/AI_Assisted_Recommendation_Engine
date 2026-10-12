@@ -157,11 +157,12 @@ COLLAB_HIGH_RATING_THRESHOLD = 4.0
 DIVERSITY_MIN_AVG_RATING = 3.8
 
 # -----------------------------------------------------------------------
-# BUSINESS WEIGHT NEUTRAL POINT
-# A normal, non promoted title sits at the neutral middle, 0.5. Promotion is
-# then a nudge above neutral, not a 15 point gap over every other title.
-# Before this, non promoted titles got 0.0, which meant a promoted title
-# started with up to 13.5 free points over everything else, just for being
-# promoted. Promoted weights must be between this value and 1.0.
+# BUSINESS WEIGHT: PROMOTION IS A SMALL NUDGE
+# A normal, non promoted title has a business weight of 0.0, so it adds
+# nothing to its score. A promoted title gets a weight above that, up to
+# BUSINESS_WEIGHT_MAX_PROMOTION. The weight counts for 15 percent of the final
+# score, so the biggest possible promotion is worth 0.5 times 0.15 times 100,
+# which is 7.5 extra points. That is a small nudge, not a head start.
 # -----------------------------------------------------------------------
-BUSINESS_WEIGHT_NEUTRAL = 0.5
+BUSINESS_WEIGHT_NEUTRAL = 0.0
+BUSINESS_WEIGHT_MAX_PROMOTION = 0.5

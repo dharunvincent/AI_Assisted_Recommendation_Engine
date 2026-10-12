@@ -35,8 +35,8 @@ def merge(generator_results):
             else:
                 merged[movie_id]["sources"].append(candidate["source"])
                 merged[movie_id]["reasons"].append(candidate["reason"])
-                # A title not promoted by this generator sits at the neutral
-                # weight, so a promotion from any generator can only raise it.
+                # A title not promoted by this generator has no promotion weight,
+                # so a promotion from any generator can only raise it.
                 candidate_weight = candidate.get("business_weight", BUSINESS_WEIGHT_NEUTRAL)
                 if candidate_weight > merged[movie_id]["business_weight"]:
                     merged[movie_id]["business_weight"] = candidate_weight

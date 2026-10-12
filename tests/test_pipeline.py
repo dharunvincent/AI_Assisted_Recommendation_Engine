@@ -19,7 +19,7 @@ from src.exclusion_filter.exclude import exclude
 from src.stage1_candidate_generation.content_based import generate as generate_content_based
 from src.pipeline import build_dislike_scores
 from src.stage1_candidate_generation.business_rules import validate_promoted_content
-from config.weights import BUSINESS_WEIGHT_NEUTRAL, MIN_RATINGS_FOR_QUALITY_FLOOR, SIGNAL_HALF_LIFE_DAYS
+from config.weights import BUSINESS_WEIGHT_MAX_PROMOTION, BUSINESS_WEIGHT_NEUTRAL, MIN_RATINGS_FOR_QUALITY_FLOOR, SIGNAL_HALF_LIFE_DAYS
 
 
 class TestDecayFormula(unittest.TestCase):
@@ -142,16 +142,16 @@ class TestDislikeDecaysUpToToday(unittest.TestCase):
 
 
 class TestPromotedWeights(unittest.TestCase):
-    def test_weight_below_neutral_is_rejected(self):
+    def test_negative_weight_is_rejected(self):
         with self.assertRaises(ValueError):
-            validate_promoted_content({1: 0.2})
+            validate_promoted_content({1: -0.1})
 
-    def test_weight_above_one_is_rejected(self):
+    def test_weight_above_the_maximum_promotion_is_rejected(self):
         with self.assertRaises(ValueError):
-            validate_promoted_content({1: 1.2})
+            validate_promoted_content({1: BUSINESS_WEIGHT_MAX_PROMOTION + 0.1})
 
-    def test_weight_between_neutral_and_one_is_accepted(self):
-        validate_promoted_content({1: BUSINESS_WEIGHT_NEUTRAL, 2: 1.0})
+    def test_weights_from_neutral_up_to_the_maximum_are_accepted(self):
+        validate_promoted_content({1: BUSINESS_WEIGHT_NEUTRAL, 2: BUSINESS_WEIGHT_MAX_PROMOTION})
 
 
 class TestExplicitGenreDislike(unittest.TestCase):

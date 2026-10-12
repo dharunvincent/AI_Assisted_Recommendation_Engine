@@ -93,8 +93,8 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
 
         completion_score = jev_answers["completion_likelihood"]["answer"]
         context_score = jev_answers["context_fit"]["answer"]
-        # A title nobody promoted sits at the neutral weight, not at zero, so
-        # promotion is a nudge above neutral instead of a head start.
+        # A title nobody promoted has no business weight and adds nothing.
+        # Promotion is a small nudge, worth at most 7.5 extra points.
         business_score = candidate.get("business_weight", BUSINESS_WEIGHT_NEUTRAL)
 
         final_score = (
