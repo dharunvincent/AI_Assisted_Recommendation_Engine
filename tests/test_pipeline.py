@@ -124,6 +124,22 @@ class TestLikedNeutralDisliked(unittest.TestCase):
         self.assertGreater(self.dislike_scores_for_completion(0.1)["Drama"], 0.0)
 
 
+class TestDislikeDecaysUpToToday(unittest.TestCase):
+    AS_OF = datetime(2026, 1, 1)  # fixed, so these tests never depend on the clock
+
+    def test_old_early_drop_off_has_faded_away(self):
+        catalog = {1: {"genres": ["Drama"]}}
+        year_ago = self.AS_OF - timedelta(days=365)
+        entry = {"movie_id": 1, "completion_pct": 0.05, "timestamp": year_ago}
+        scores = build_dislike_scores({"watch_history": [entry]}, catalog, as_of=self.AS_OF)
+        self.assertLess(scores["Drama"], 0.1)
+
+    def test_thumbs_down_today_keeps_full_strength(self):
+        user = {"watch_history": [], "disliked_genres": ["Animation"]}
+        scores = build_dislike_scores(user, catalog={}, as_of=self.AS_OF)
+        self.assertAlmostEqual(scores["Animation"], 1.0, places=3)
+
+
 class TestExplicitGenreDislike(unittest.TestCase):
     def test_disliked_genre_gets_a_full_strength_score(self):
         user = {"watch_history": [], "disliked_genres": ["Animation"]}

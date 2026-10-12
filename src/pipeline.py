@@ -25,7 +25,7 @@ from datetime import datetime
 
 from src.catalog import load_catalog
 from src.user_profile.synthetic_users import build_all_personas
-from src.user_profile.taste_score import update_dislike_score
+from src.user_profile.taste_score import update_dislike_score, decay_to
 from src.exclusion_filter.exclude import exclude
 from src.stage2_jev_ranking.rank import rank_candidates
 
@@ -81,14 +81,20 @@ def run_stage1(user, catalog, context):
     return shortlist
 
 
-def build_dislike_scores(user, catalog):
+def build_dislike_scores(user, catalog, as_of=None):
     """
     Walks this user's watch history once and builds up a dislike score
     per genre using the decay formula, simulating what would normally
     be an incremental background job updating these scores a little bit
     at a time as events happen, instead of recomputing from scratch on
     every single request.
+
+    as_of is the moment the scores are read, today by default. Tests pass
+    a fixed date so they never depend on the clock. Every score is decayed
+    up to as_of at the end, so an old dislike fades even when no newer
+    event touched that genre.
     """
+    as_of = as_of or datetime.now()
     dislike_scores = {}
     last_updated = {}
 
@@ -120,18 +126,23 @@ def build_dislike_scores(user, catalog):
 
     # Genres the user has openly said they dislike, like a thumbs down on
     # a whole genre. Same decay formula, just the strongest signal type.
-    now = datetime.now()
+    # The thumbs down counts as happening at as_of, so it has full strength.
     for genre in user.get("disliked_genres", []):
         new_score, new_timestamp = update_dislike_score(
             old_score=dislike_scores.get(genre, 0.0),
-            old_score_timestamp=last_updated.get(genre, now),
+            old_score_timestamp=last_updated.get(genre, as_of),
             event_type="explicit_thumbs_down",
-            event_timestamp=now,
+            event_timestamp=as_of,
         )
         dislike_scores[genre] = new_score
         last_updated[genre] = new_timestamp
 
-    return dislike_scores
+    # Fade every score from its last update up to as_of. Without this, a
+    # score only decays when the next event for that genre arrives.
+    return {
+        genre: decay_to(score, last_updated[genre], as_of)
+        for genre, score in dislike_scores.items()
+    }
 
 
 def run_pipeline_for_user(user, catalog, context):

@@ -41,6 +41,18 @@ def decay_factor(days_elapsed):
     return math.pow(0.5, days_elapsed / SIGNAL_HALF_LIFE_DAYS)
 
 
+def decay_to(score, last_updated, as_of):
+    """
+    Returns what a stored score is worth at the moment as_of, given that it
+    was last updated at last_updated. update_dislike_score only decays a
+    score when a NEW event arrives, so a dislike from a year ago with no
+    newer event would otherwise keep its full strength forever. Calling this
+    once at read time makes old signals fade even when nothing new happened.
+    """
+    days_elapsed = max((as_of - last_updated).days, 0)
+    return score * decay_factor(days_elapsed)
+
+
 def signal_weight_for_event(event_type, completion_pct=None):
     """
     Maps a raw user event into the base weight it should carry, before
