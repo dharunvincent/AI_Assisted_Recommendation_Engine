@@ -166,3 +166,11 @@ DIVERSITY_MIN_AVG_RATING = 3.8
 # -----------------------------------------------------------------------
 BUSINESS_WEIGHT_NEUTRAL = 0.0
 BUSINESS_WEIGHT_MAX_PROMOTION = 0.5
+
+# -----------------------------------------------------------------------
+# COLLABORATIVE FILTERING MINIMUM SHARED USERS
+# Two movies are only treated as linked if at least this many users rated
+# both highly. Very small counts are noise: two users agreeing by chance
+# says nothing about what a third user would enjoy.
+# -----------------------------------------------------------------------
+COLLAB_MIN_CO_OCCURRENCE = 3
