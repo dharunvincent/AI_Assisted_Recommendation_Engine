@@ -20,7 +20,6 @@ Or for one persona only:  python -m src.pipeline --persona dharun
 """
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from src.catalog import load_catalog
@@ -49,9 +48,14 @@ from config.weights import (
 
 def run_stage1(user, catalog, context):
     """
-    Runs all eight generators. They are independent of each other and
-    each one only reads data, it never writes anything, so they are
-    safe to run in parallel threads to save wall clock time.
+    Runs all eight generators one after another and merges their output.
+
+    In a real platform each generator would be its own service, called in
+    parallel over the network, and parallel calls really do save time there
+    because each service does its own work. Inside this one Python process
+    the generators are pure CPU work, so threads would give no speed up
+    (Python lets only one thread run Python code at a time). A plain loop is
+    simpler and gives exactly the same answers.
     """
     jobs = [
         lambda: content_based.generate(user, catalog),
@@ -64,8 +68,7 @@ def run_stage1(user, catalog, context):
         lambda: diversity.generate(user, catalog, random_seed=7),
     ]
 
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        results = list(pool.map(lambda job: job(), jobs))
+    results = [job() for job in jobs]
 
     return merge(results)
 

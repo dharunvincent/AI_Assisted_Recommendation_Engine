@@ -21,8 +21,10 @@ from config.weights import DIVERSITY_MIN_AVG_RATING
 
 
 def generate(user, catalog, max_candidates=5, random_seed=None):
-    if random_seed is not None:
-        random.seed(random_seed)
+    # A private random generator, so a seed here never changes the random
+    # numbers used by any other code in the program. random.seed() would
+    # reset the shared global generator for everyone.
+    rng = random.Random(random_seed)
 
     watched_ids = {entry["movie_id"] for entry in user["watch_history"]}
 
@@ -44,7 +46,7 @@ def generate(user, catalog, max_candidates=5, random_seed=None):
         return []
 
     sample_size = min(max_candidates, len(unexplored_candidates))
-    chosen = random.sample(unexplored_candidates, sample_size)
+    chosen = rng.sample(unexplored_candidates, sample_size)
 
     return [
         {

@@ -61,8 +61,10 @@ The engine runs in two stages.
 
 **Stage one, candidate generation.** Eight independent methods each look
 at the user and the catalog from a different angle, and each one
-produces a small list of candidate titles. All eight run at the same
-time. Their output gets merged into one shortlist of around 30 to 50
+produces a small list of candidate titles. In a real platform the eight
+would run in parallel, each as its own service. In this project they run
+one after another, because inside one Python process this work is pure
+CPU, so parallel threads would not make it faster. Their output gets merged into one shortlist of around 30 to 50
 titles. A cleanup step called the exclusion filter then removes anything
 the user has already watched or has explicitly blocked.
 
@@ -128,7 +130,9 @@ Each generator lives in its own file inside `src/stage1_candidate_generation/`
    so the user does not get stuck seeing more of the same thing forever.
    This exists specifically to fight the filter bubble problem.
 
-All eight run at once and their results get merged and deduplicated in
+All eight are designed to run in parallel in a real platform, and run one
+after another in this project, because threads give no speed up for pure
+CPU work in one Python process. Their results get merged and deduplicated in
 `merge_shortlist.py`. If more than one generator independently suggests
 the same title, that title is treated as a stronger candidate.
 
