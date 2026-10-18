@@ -16,13 +16,17 @@ Order of operations:
 
 Run with:  python -m src.pipeline
 Or for one persona only:  python -m src.pipeline --persona dharun
+Or for your own taste file:  python -m src.pipeline --persona-file personas/example.json
 (this must be run from the project's root folder, not from inside src)
 """
 
 import argparse
+import sys
 from datetime import datetime
 
 from src.catalog import load_catalog
+from src.run_warnings import count_missing_movie_data, format_warning_section
+from src.user_profile.persona_loader import load_persona_file
 from src.user_profile.synthetic_users import build_all_personas
 from src.user_profile.taste_score import update_dislike_score, decay_to
 from src.exclusion_filter.exclude import exclude
@@ -219,22 +223,64 @@ def print_results(user, ranked):
         )
 
 
+def missing_data_kinds(user):
+    """
+    Which kinds of missing movie data matter to this persona, so the warnings
+    only mention data the persona actually uses.
+    """
+    kinds = []
+    if user.get("min_imdb_rating") is not None:
+        kinds.append("rating")
+    if user.get("preferred_directors") or user.get("avoided_directors"):
+        kinds.append("directors")
+    if user.get("preferred_cast") or user.get("avoided_cast"):
+        kinds.append("cast")
+    return kinds
+
+
+def print_warning_section(user, catalog, warnings):
+    """Prints the grouped Warnings section once, nothing at all if it is empty."""
+    missing_counts = count_missing_movie_data(catalog, missing_data_kinds(user))
+    lines = format_warning_section(warnings, missing_counts)
+    if lines:
+        print("\n" + "\n".join(lines))
+
+
+def run_persona_file(path, catalog, context):
+    """
+    Runs the pipeline for a persona file. Returns the exit code: 1 when the
+    file has an error that makes the results meaningless (printed clearly),
+    otherwise 0. Warnings never stop the run, they print once at the end.
+    """
+    result = load_persona_file(path, catalog)
+    if result.user is None:
+        print(f"\nCannot run with persona file '{path}':")
+        for error in result.errors:
+            print(f"- {error}")
+        return 1
+
+    ranked = run_pipeline_for_user(result.user, catalog, context)
+    print_results(result.user, ranked)
+    print_warning_section(result.user, catalog, result.warnings)
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run the recommendation engine on the synthetic personas.")
     parser.add_argument("--persona", help="run only this persona, by first name, for example dharun")
+    parser.add_argument(
+        "--persona-file", help="run on your own taste file, for example personas/example.json"
+    )
     args = parser.parse_args()
 
     print("Loading MovieLens catalog ...")
-    catalog = load_catalog()
+    try:
+        catalog = load_catalog()
+    except FileNotFoundError as error:
+        # Without MovieLens there is nothing to recommend, so stop clearly.
+        print(error)
+        return 1
     print(f"Loaded {len(catalog)} titles.")
-
-    users = build_all_personas(catalog)
-
-    if args.persona:
-        users = [user for user in users if user["name"].lower() == args.persona.lower()]
-        if not users:
-            print(f"No persona named '{args.persona}'. Try one of: Arjun, Meera, Thomas, Dharun.")
-            return
 
     # A simple example context, a Friday evening session. You can change
     # this to try the other buckets defined in context_aware.py
@@ -243,10 +289,22 @@ def main():
         "day_of_week": "Friday",
     }
 
+    if args.persona_file:
+        return run_persona_file(args.persona_file, catalog, context)
+
+    users = build_all_personas(catalog)
+
+    if args.persona:
+        users = [user for user in users if user["name"].lower() == args.persona.lower()]
+        if not users:
+            print(f"No persona named '{args.persona}'. Try one of: Arjun, Meera, Thomas, Dharun.")
+            return 0
+
     for user in users:
         ranked = run_pipeline_for_user(user, catalog, context)
         print_results(user, ranked)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

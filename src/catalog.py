@@ -112,3 +112,12 @@ def load_catalog(imdb_path: str = IMDB_ENRICHED_PATH):
 
     _add_imdb_fields(catalog, imdb_path)
     return catalog
+
+
+def catalog_has_imdb_data(catalog: Dict[int, Dict[str, Any]]) -> bool:
+    """
+    True when data/imdb_enriched.csv was loaded. Checked by looking for at
+    least one rating, so a half empty file counts as "no IMDb data" and the
+    IMDb based preferences are skipped instead of silently matching nothing.
+    """
+    return any(movie["imdb_rating"] is not None for movie in catalog.values())

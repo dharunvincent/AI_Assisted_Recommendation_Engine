@@ -174,3 +174,29 @@ BUSINESS_WEIGHT_MAX_PROMOTION = 0.5
 # says nothing about what a third user would enjoy.
 # -----------------------------------------------------------------------
 COLLAB_MIN_CO_OCCURRENCE = 3
+
+# -----------------------------------------------------------------------
+# PERSONA FILE: WATCH HISTORY FROM FAVOURITE TITLES
+# A brand new user has no history, which is the "cold start" problem:
+# collaborative filtering needs real liked titles to find similar movies.
+# Favourite titles from the persona file are the quickest fix, so each one
+# becomes a finished watch (95 percent completed, comfortably above the
+# liked threshold) with a recent date, spaced out a little so they do not
+# all share one timestamp. Without favourites, the genre based history
+# builder in synthetic_users.py is used instead with the completion range
+# and seed below (the same values the existing Dharun persona uses).
+# -----------------------------------------------------------------------
+FAVOURITE_COMPLETION_PCT = 0.95
+FAVOURITE_FIRST_WATCH_DAYS_AGO = 7
+FAVOURITE_WATCH_SPACING_DAYS = 3
+PERSONA_FILE_GENRE_HISTORY_COMPLETION_RANGE = (0.8, 1.0)
+PERSONA_FILE_HISTORY_SEED = 42
+
+# -----------------------------------------------------------------------
+# PERSONA FILE: "DID YOU MEAN" SUGGESTIONS
+# How close a typed name must be to a real one (0 to 1, difflib's ratio) to
+# be offered as a suggestion, and how many to offer. 0.6 is difflib's own
+# default, loose enough that "Chris Nolan" finds "Christopher Nolan".
+# -----------------------------------------------------------------------
+SUGGESTION_MATCH_CUTOFF = 0.6
+MAX_SUGGESTIONS = 3

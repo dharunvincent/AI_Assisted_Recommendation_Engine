@@ -1,0 +1,13 @@
+{
+  "name": "Dharun",
+  "liked_genres": ["Action", "Thriller", "Crime", "Documentary"],
+  "disliked_genres": ["Animation"],
+  "min_imdb_rating": 7.0,
+  "year_from": 1990,
+  "year_to": 2018,
+  "preferred_directors": ["Christopher Nolan", "Michael Mann"],
+  "preferred_cast": ["Robert De Niro", "Al Pacino"],
+  "avoided_directors": [],
+  "avoided_cast": [],
+  "favourite_titles": ["Heat", "The Usual Suspects"]
+}
