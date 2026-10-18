@@ -657,7 +657,7 @@ Limits of this evaluation:
 
 ## Round three changes
 
-All ten changes keep the locked decisions (watch bands, the 0.55 penalty
+These changes keep the locked decisions (watch bands, the 0.55 penalty
 scale, hard filters, the 7.5 point promotion limit, the preferred person boost,
 the mock scorer, the ranking weights 45/25/15/15, the match percent and the
 85 badge). In plain English:
