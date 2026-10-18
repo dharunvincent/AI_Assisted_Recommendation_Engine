@@ -1,7 +1,7 @@
 """
 src/stage1_candidate_generation/session_based.py
 
-GENERATOR 6 of 8: Session based filtering
+GENERATOR 6 of 9: Session based filtering
 
 This looks only at what the user has clicked on or watched in the
 current sitting, not their whole history. If someone just finished two

@@ -1,7 +1,7 @@
 """
 src/stage1_candidate_generation/business_rules.py
 
-GENERATOR 7 of 8: Business rules based promotion
+GENERATOR 7 of 9: Business rules based promotion
 
 Some content gets pushed by the platform itself for business reasons,
 for example a new show the platform spent a lot of money on, or a title

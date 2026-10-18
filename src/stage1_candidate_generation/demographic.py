@@ -1,7 +1,7 @@
 """
 src/stage1_candidate_generation/demographic.py
 
-GENERATOR 3 of 8: Demographic filtering
+GENERATOR 3 of 9: Demographic filtering
 
 Recommends movies that tend to do well with people who share the user's
 age group, regardless of that specific user's own watch history. This is

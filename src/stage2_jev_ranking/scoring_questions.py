@@ -25,6 +25,8 @@ from src.stage2_jev_ranking.jev_client import Score, Choice
 from config.weights import (
     TASTE_BIAS_BASE,
     TASTE_BIAS_PER_GENRE_OVERLAP,
+    TASTE_BIAS_PER_PREFERRED_PERSON,
+    TASTE_BIAS_PEOPLE_CAP,
     CONTEXT_BIAS_FROM_CONTEXT_GENERATOR,
     CONTEXT_BIAS_DEFAULT,
     OVERRIDE_BIAS_STRONG_FIT,
@@ -33,14 +35,19 @@ from config.weights import (
 )
 
 
-def build_state(user, movie, candidate, context, dislike_penalty):
+def build_state(user, movie, candidate, context, dislike_penalty, preferred_people=()):
     """
     Builds the "state", the facts JEV is allowed to see for this one
     user and this one candidate movie. Keeping this small and specific
     mirrors the real JEV context limit, which rewards short, focused
     state over dumping a user's entire history into every call.
+
+    preferred_people are the user's favourite directors and actors found in
+    this movie. The key is only added when there are some: the mock JEV
+    hashes the whole state, so an always present empty key would change the
+    answers for every user who has no preferred people.
     """
-    return {
+    state = {
         "movie_title": movie["title"],
         "movie_genres": tuple(sorted(movie["genres"])),
         "movie_avg_rating": movie["avg_rating"],
@@ -50,9 +57,22 @@ def build_state(user, movie, candidate, context, dislike_penalty):
         "context_time_of_day": context.get("time_of_day"),
         "context_day_of_week": context.get("day_of_week"),
     }
+    if preferred_people:
+        state["preferred_people_matched"] = tuple(sorted(preferred_people))
+    return state
 
 
-def build_questions(movie, candidate, dislike_penalty, genre_overlap_count):
+def people_taste_boost(preferred_people_count):
+    """
+    The extra expected taste fit for preferred directors and actors in this
+    title: a fixed step per person, capped so cast alone cannot decide the rank.
+    """
+    return min(preferred_people_count * TASTE_BIAS_PER_PREFERRED_PERSON, TASTE_BIAS_PEOPLE_CAP)
+
+
+def build_questions(
+    movie, candidate, dislike_penalty, genre_overlap_count, preferred_people_count=0
+):
     """
     Returns the dict of questions to send to jev_client.ask(), each
     carrying a bias_hint worked out from simple real facts. See
@@ -63,7 +83,11 @@ def build_questions(movie, candidate, dislike_penalty, genre_overlap_count):
     # deliberately NOT part of this number. It is applied exactly once,
     # in rank.py, so that the override logic can soften it cleanly. If it
     # was also subtracted here, the override could never fully work.
-    taste_bias = TASTE_BIAS_BASE + (genre_overlap_count * TASTE_BIAS_PER_GENRE_OVERLAP)
+    taste_bias = (
+        TASTE_BIAS_BASE
+        + (genre_overlap_count * TASTE_BIAS_PER_GENRE_OVERLAP)
+        + people_taste_boost(preferred_people_count)
+    )
 
     # Rough expectation for completion likelihood, a well regarded movie
     # in the real MovieLens data is a reasonable proxy for "most people

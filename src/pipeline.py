@@ -8,7 +8,7 @@ system work on the synthetic personas.
 Order of operations:
 1. Load the real MovieLens catalog
 2. Build synthetic persona users on top of it
-3. Run all eight stage 1 candidate generators
+3. Run all nine stage 1 candidate generators
 4. Merge their output into one shortlist
 5. Run the exclusion filter cleanup step
 6. Run stage 2 JEV ranking (mocked) to score and sort the shortlist
@@ -16,16 +16,26 @@ Order of operations:
 
 Run with:  python -m src.pipeline
 Or for one persona only:  python -m src.pipeline --persona dharun
+Or for your own taste file:  python -m src.pipeline --persona-file personas/example.json
 (this must be run from the project's root folder, not from inside src)
 """
 
 import argparse
-from datetime import datetime
+import sys
+from datetime import date, datetime
 
 from src.catalog import load_catalog
+from src.results_report import (
+    build_result_rows,
+    format_filter_report,
+    format_result_lines,
+    write_results_csv,
+)
+from src.run_warnings import count_missing_movie_data, format_warning_section
+from src.user_profile.persona_loader import load_persona_file
 from src.user_profile.synthetic_users import build_all_personas
 from src.user_profile.taste_score import update_dislike_score, decay_to
-from src.exclusion_filter.exclude import exclude
+from src.exclusion_filter.exclude import apply_hard_filters
 from src.stage2_jev_ranking.rank import rank_candidates
 
 from src.stage1_candidate_generation import (
@@ -37,6 +47,7 @@ from src.stage1_candidate_generation import (
     session_based,
     business_rules,
     diversity,
+    people_based,
 )
 from src.stage1_candidate_generation.merge_shortlist import merge
 from config.weights import (
@@ -48,7 +59,7 @@ from config.weights import (
 
 def run_generators(user, catalog, context, similarity_table=None):
     """
-    Runs all eight generators one after another. Returns a dict of generator
+    Runs all nine generators one after another. Returns a dict of generator
     name mapped to that generator's own candidate list, in running order.
     similarity_table lets the evaluation hand collaborative filtering a table
     that was built without the held out ratings, see src/evaluate.py.
@@ -69,6 +80,9 @@ def run_generators(user, catalog, context, similarity_table=None):
         "session_based": lambda: session_based.generate(user, catalog),
         "business_rules": lambda: business_rules.generate(user, catalog),
         "diversity": lambda: diversity.generate(user, catalog, random_seed=7),
+        # Last on purpose: it returns nothing for users without preferred people,
+        # so it never changes the result for the four built in personas.
+        "people_based": lambda: people_based.generate(user, catalog),
     }
 
     return {name: job() for name, job in jobs.items()}
@@ -173,11 +187,18 @@ def run_pipeline_stages(user, catalog, context, as_of=None, similarity_table=Non
     """
     generator_results = run_generators(user, catalog, context, similarity_table)
     merged = merge(list(generator_results.values()))
-    cleaned = exclude(merged, user, catalog)
-    shortlist = trim_shortlist(cleaned)
+    outcome = apply_hard_filters(merged, user, catalog)
+    shortlist = trim_shortlist(outcome.kept)
     dislike_scores = build_dislike_scores(user, catalog, as_of)
     ranked = rank_candidates(user, catalog, shortlist, context, dislike_scores)
-    return {"generator_results": generator_results, "shortlist": shortlist, "ranked": ranked}
+    return {
+        "generator_results": generator_results,
+        "shortlist": shortlist,
+        "ranked": ranked,
+        # What each hard filter removed, for the filter report of a persona file run.
+        "filter_counts": outcome.removed_counts,
+        "candidate_count": len(merged),
+    }
 
 
 def run_pipeline_for_user(user, catalog, context):
@@ -219,22 +240,82 @@ def print_results(user, ranked):
         )
 
 
+def missing_data_kinds(user):
+    """
+    Which kinds of missing movie data matter to this persona, so the warnings
+    only mention data the persona actually uses.
+    """
+    kinds = []
+    if user.get("min_imdb_rating") is not None:
+        kinds.append("rating")
+    if user.get("preferred_directors") or user.get("avoided_directors"):
+        kinds.append("directors")
+    if user.get("preferred_cast") or user.get("avoided_cast"):
+        kinds.append("cast")
+    return kinds
+
+
+def print_warning_section(user, catalog, warnings):
+    """Prints the grouped Warnings section once, nothing at all if it is empty."""
+    missing_counts = count_missing_movie_data(catalog, missing_data_kinds(user))
+    lines = format_warning_section(warnings, missing_counts)
+    if lines:
+        print("\n" + "\n".join(lines))
+
+
+def run_persona_file(path, catalog, context):
+    """
+    Runs the pipeline for a persona file. Returns the exit code: 1 when the
+    file has an error that makes the results meaningless (printed clearly),
+    otherwise 0. Warnings never stop the run, they print once at the end.
+    """
+    result = load_persona_file(path, catalog)
+    if result.user is None:
+        print(f"\nCannot run with persona file '{path}':")
+        for error in result.errors:
+            print(f"- {error}")
+        return 1
+
+    user = result.user
+    stages = run_pipeline_stages(user, catalog, context)
+    warn_if_shortlist_too_small(user, stages["shortlist"])
+    rows = build_result_rows(stages["ranked"], catalog)
+
+    print(f"\n=== Recommendations for {user['name']} ===")
+    print(f"Taste: {user['taste_summary']}")
+    print("\n".join(format_result_lines(rows)))
+
+    warnings = list(result.warnings)
+    try:
+        path = write_results_csv(rows, user["name"], date.today())
+        print(f"\nFull ranked list ({len(rows)} titles) saved to {path}")
+    except OSError as error:
+        # The list is already on screen, so a failed save is a warning, not a stop.
+        warnings.append(f"Could not save the results file: {error}")
+
+    print("\n" + "\n".join(format_filter_report(
+        stages["filter_counts"], stages["candidate_count"], len(rows)
+    )))
+    print_warning_section(user, catalog, warnings)
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run the recommendation engine on the synthetic personas.")
     parser.add_argument("--persona", help="run only this persona, by first name, for example dharun")
+    parser.add_argument(
+        "--persona-file", help="run on your own taste file, for example personas/example.json"
+    )
     args = parser.parse_args()
 
     print("Loading MovieLens catalog ...")
-    catalog = load_catalog()
+    try:
+        catalog = load_catalog()
+    except FileNotFoundError as error:
+        # Without MovieLens there is nothing to recommend, so stop clearly.
+        print(error)
+        return 1
     print(f"Loaded {len(catalog)} titles.")
-
-    users = build_all_personas(catalog)
-
-    if args.persona:
-        users = [user for user in users if user["name"].lower() == args.persona.lower()]
-        if not users:
-            print(f"No persona named '{args.persona}'. Try one of: Arjun, Meera, Thomas, Dharun.")
-            return
 
     # A simple example context, a Friday evening session. You can change
     # this to try the other buckets defined in context_aware.py
@@ -243,10 +324,22 @@ def main():
         "day_of_week": "Friday",
     }
 
+    if args.persona_file:
+        return run_persona_file(args.persona_file, catalog, context)
+
+    users = build_all_personas(catalog)
+
+    if args.persona:
+        users = [user for user in users if user["name"].lower() == args.persona.lower()]
+        if not users:
+            print(f"No persona named '{args.persona}'. Try one of: Arjun, Meera, Thomas, Dharun.")
+            return 0
+
     for user in users:
         ranked = run_pipeline_for_user(user, catalog, context)
         print_results(user, ranked)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

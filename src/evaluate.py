@@ -65,6 +65,13 @@ COMPLETION_FOR_LOW_RATING = 0.1      # rated 2.5 or less, a dislike signal
 EVAL_CONTEXT = {"time_of_day": "evening", "day_of_week": "Friday"}
 
 
+# Generators that only work from preferences a persona file states. These
+# evaluation users are built from rating history alone, so such a generator
+# could only ever show 0.0 percent here. It is left out of the report so the
+# evaluation output stays exactly as it was before the persona file work.
+PERSONA_ONLY_GENERATORS = {"people_based"}
+
+
 def read_ratings_by_user():
     """Returns {user_id: [(timestamp, movie_id, rating), ...]} sorted by time."""
     ratings_by_user = defaultdict(list)
@@ -193,6 +200,8 @@ def evaluate():
 
         shortlist_hits += len(answers & {c["movie_id"] for c in stages["shortlist"]})
         for name, candidates in stages["generator_results"].items():
+            if name in PERSONA_ONLY_GENERATORS:
+                continue
             generator_hits[name] += len(answers & {c["movie_id"] for c in candidates})
 
         top_ranked = {item["movie_id"] for item in stages["ranked"][:TOP_K]}

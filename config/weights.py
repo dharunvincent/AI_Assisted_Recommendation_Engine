@@ -174,3 +174,57 @@ BUSINESS_WEIGHT_MAX_PROMOTION = 0.5
 # says nothing about what a third user would enjoy.
 # -----------------------------------------------------------------------
 COLLAB_MIN_CO_OCCURRENCE = 3
+
+# -----------------------------------------------------------------------
+# PERSONA FILE: WATCH HISTORY FROM FAVOURITE TITLES
+# A brand new user has no history, which is the "cold start" problem:
+# collaborative filtering needs real liked titles to find similar movies.
+# Favourite titles from the persona file are the quickest fix, so each one
+# becomes a finished watch (95 percent completed, comfortably above the
+# liked threshold) with a recent date, spaced out a little so they do not
+# all share one timestamp. Without favourites, the genre based history
+# builder in synthetic_users.py is used instead with the completion range
+# and seed below (the same values the existing Dharun persona uses).
+# -----------------------------------------------------------------------
+FAVOURITE_COMPLETION_PCT = 0.95
+FAVOURITE_FIRST_WATCH_DAYS_AGO = 7
+FAVOURITE_WATCH_SPACING_DAYS = 3
+PERSONA_FILE_GENRE_HISTORY_COMPLETION_RANGE = (0.8, 1.0)
+PERSONA_FILE_HISTORY_SEED = 42
+
+# -----------------------------------------------------------------------
+# PERSONA FILE: "DID YOU MEAN" SUGGESTIONS
+# How close a typed name must be to a real one (0 to 1, difflib's ratio) to
+# be offered as a suggestion, and how many to offer. 0.6 is difflib's own
+# default, loose enough that "Chris Nolan" finds "Christopher Nolan".
+# -----------------------------------------------------------------------
+SUGGESTION_MATCH_CUTOFF = 0.6
+MAX_SUGGESTIONS = 3
+
+# -----------------------------------------------------------------------
+# IMDB RATING FLOOR MINIMUM VOTES
+# When a persona sets min_imdb_rating, a title only passes if at least this
+# many people voted for it on IMDb. A high rating from a handful of voters
+# cannot be trusted, same idea as MIN_RATINGS_FOR_QUALITY_FLOOR above for the
+# MovieLens floor. A title with no IMDb rating at all is removed too.
+# -----------------------------------------------------------------------
+MIN_IMDB_VOTES_FOR_FLOOR = 1000
+
+# -----------------------------------------------------------------------
+# PREFERRED DIRECTORS AND CAST: TASTE BIAS
+# Every preferred director or actor found in a title raises the expected
+# taste fit (see TASTE_BIAS_BASE above) by this much, up to a cap. The cap
+# stops a title with three favourite actors from beating everything on cast
+# alone: genre match and the other questions should still matter.
+# -----------------------------------------------------------------------
+TASTE_BIAS_PER_PREFERRED_PERSON = 0.08
+TASTE_BIAS_PEOPLE_CAP = 0.16
+
+# -----------------------------------------------------------------------
+# PERSONA FILE RESULTS
+# How many titles the printed list shows, and how short the final list can
+# get before the filter report names the strictest filter (so the user knows
+# which preference to relax). The saved CSV always has the full ranked list.
+# -----------------------------------------------------------------------
+PRINTED_RESULT_COUNT = 15
+SHORT_LIST_WARNING_BELOW = 15

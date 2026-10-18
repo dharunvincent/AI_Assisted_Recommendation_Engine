@@ -46,3 +46,29 @@ measured results.
 You do not need to use Gemini or any outside AI tool for this part. The
 persona generation is handled by plain code, so it gives the same result
 every time you run the project.
+
+## 3. IMDb ratings, directors and cast (optional)
+
+MovieLens has no IMDb scores, directors or actors. The persona file
+(`personas/`) can use them, for example "only movies rated 7.0 or more on
+IMDb" or "directed by Michael Mann". The engine still runs without this
+step, the IMDb based preferences are just skipped with a warning.
+
+Steps:
+1. Make sure step 1 is done (the script needs `ml-latest-small/links.csv`).
+2. Run `python3 data/download_imdb.py`
+3. It downloads four files from https://datasets.imdbws.com/ (title.ratings,
+   title.crew, title.principals, name.basics). This is several hundred MB and
+   takes a few minutes. They are read line by line, never loaded whole.
+4. It keeps only the movies that exist in MovieLens, writes the small file
+   `data/imdb_enriched.csv`, deletes the big downloads and prints how many
+   movies were matched and how many have no IMDb rating.
+
+Cast means the top 5 billed actors and actresses. Documentaries often list
+their people as "self", so they can end up with an empty cast.
+
+Licence: IMDb datasets are free for personal and non commercial use only,
+see https://www.imdb.com/interfaces/ . Do not use this data in a product
+you sell, and do not commit it to git (it is in `.gitignore`).
+Credit line IMDb asks for: "Information courtesy of IMDb (https://www.imdb.com).
+Used with permission."

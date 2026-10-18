@@ -1,7 +1,7 @@
 """
 src/stage1_candidate_generation/merge_shortlist.py
 
-Takes the output of all eight stage 1 generators and merges them into
+Takes the output of all nine stage 1 generators and merges them into
 one single list. The same movie can get suggested by more than one
 generator, for example a movie might show up from both content_based and
 trending. When that happens we keep it once, but we remember every

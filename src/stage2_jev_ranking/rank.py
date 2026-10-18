@@ -18,6 +18,7 @@ architecture, not a measured result from a real trained model.
 """
 
 from src.stage2_jev_ranking import jev_client, scoring_questions
+from src.user_profile.people_match import matched_preferred_people
 from config.weights import (
     TASTE_FIT_WEIGHT,
     COMPLETION_LIKELIHOOD_WEIGHT,
@@ -64,8 +65,14 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
 
         genre_overlap_count = _genre_overlap_count(user, catalog, movie)
 
-        state = scoring_questions.build_state(user, movie, candidate, context, dislike_penalty)
-        questions = scoring_questions.build_questions(movie, candidate, dislike_penalty, genre_overlap_count)
+        preferred_people = matched_preferred_people(user, movie)
+
+        state = scoring_questions.build_state(
+            user, movie, candidate, context, dislike_penalty, preferred_people
+        )
+        questions = scoring_questions.build_questions(
+            movie, candidate, dislike_penalty, genre_overlap_count, len(preferred_people)
+        )
         jev_answers = jev_client.ask(state, questions)
 
         # The taste fit question is asked "ignoring any general dislike", so

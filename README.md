@@ -59,9 +59,9 @@ approach than someone who has watched hundreds of titles.
 
 The engine runs in two stages.
 
-**Stage one, candidate generation.** Eight independent methods each look
+**Stage one, candidate generation.** Nine independent methods each look
 at the user and the catalog from a different angle, and each one
-produces a small list of candidate titles. In a real platform the eight
+produces a small list of candidate titles. In a real platform the nine
 would run in parallel, each as its own service. In this project they run
 one after another, because inside one Python process this work is pure
 CPU, so parallel threads would not make it faster. Their output gets
@@ -79,7 +79,7 @@ engine asks JEV multiple small questions per title instead of one big
 vague question, then combines the answers itself using fixed weights,
 into one final score out of 100 for each title.
 
-## Stage one, the eight candidate generators
+## Stage one, the nine candidate generators
 
 Each generator lives in its own file inside `src/stage1_candidate_generation/`
 
@@ -137,7 +137,13 @@ Each generator lives in its own file inside `src/stage1_candidate_generation/`
    so the user does not get stuck seeing more of the same thing forever.
    This exists specifically to fight the filter bubble problem.
 
-All eight are designed to run in parallel in a real platform, and run one
+9. **Preferred directors and cast** (`people_based.py`) Only active for a
+   persona file that names favourite directors or actors (see "Run it
+   with your own taste"). It finds unwatched titles with one of those
+   people, best known first, with a reason like "directed by Michael
+   Mann". For the four built in personas it returns nothing.
+
+All nine are designed to run in parallel in a real platform, and run one
 after another in this project, because threads give no speed up for pure
 CPU work in one Python process. Their results get merged and deduplicated in
 `merge_shortlist.py`. If more than one generator independently suggests
@@ -155,6 +161,13 @@ titles rated below it, with no rating, or with fewer than 20 ratings (a
 high average from only a few raters cannot be trusted). This is different
 from a soft dislike, which stage two still handles with a penalty, not a
 removal. The list is trimmed to its maximum size only after this step.
+
+A persona file adds three more hard rules, each active only when the file
+sets it: a release year range, an IMDb rating floor (titles with no IMDb
+rating, or fewer than 1000 IMDb votes, are removed too, and this floor
+replaces the MovieLens one for that persona), and directors or cast the
+user never wants to see. Disliked genres stay a soft penalty in stage two on
+purpose: a genre dislike is a lean, an avoided person is a rule.
 
 ## Stage two, JEV ranking, in detail
 
@@ -285,20 +298,31 @@ AI_Assisted_Recommendation_Engine/
 │   └── weights.py                Every scoring weight and threshold, in one place
 ├── data/
 │   ├── README.md                 Explains the MovieLens dataset and the synthetic data
-│   └── download_movielens.py     Run this once to download the real dataset
+│   ├── download_movielens.py     Run this once to download the real dataset
+│   └── download_imdb.py          Optional, adds IMDb rating, directors and cast
+├── personas/
+│   ├── README.md                 Every persona file field explained
+│   └── example.json              A persona file to copy and edit
 ├── src/
-│   ├── catalog.py                 Loads the MovieLens CSV files into memory
+│   ├── catalog.py                 Loads the MovieLens (and optional IMDb) data into memory
+│   ├── results_report.py           Printed list, results CSV and the filter report
+│   ├── run_warnings.py             The grouped "Warnings" section
 │   ├── pipeline.py                 The main entry point, runs everything end to end
 │   ├── evaluate.py                 Offline evaluation on real MovieLens users
-│   ├── stage1_candidate_generation/   The eight generators, plus the merge step
+│   ├── stage1_candidate_generation/   The nine generators, plus the merge step
 │   ├── exclusion_filter/            Removes watched, blocked and low quality titles
 │   ├── stage2_jev_ranking/          The mock JEV client, the questions, and the ranking logic
-│   └── user_profile/                Synthetic personas and the dislike decay formula
+│   └── user_profile/                Synthetic personas, the persona file loader, the dislike decay formula
 └── tests/
     ├── test_pipeline.py           Tests for the core logic, filters, merge and decay
     ├── test_rank.py               Tests for the stage 2 penalty, override, business weight and badge
     ├── test_jev_client.py         Tests for how the mock JEV client behaves
-    └── test_evaluate.py           Tests that the evaluation split never leaks an answer
+    ├── test_evaluate.py           Tests that the evaluation split never leaks an answer
+    ├── test_imdb_data.py          Tests for the IMDb download helpers and catalog fields
+    ├── test_persona_loader.py     Tests for the persona file, one group per failure level
+    ├── test_hard_filters.py       Tests for the year, IMDb floor and avoided people filters
+    ├── test_people.py             Tests for the people generator and the capped taste boost
+    └── test_results_report.py     Tests for the printed list, the CSV and the filter report
 ```
 
 ## How to run this project
@@ -326,6 +350,67 @@ AI_Assisted_Recommendation_Engine/
    ```
 
 No API keys and no paid services are needed to run this project.
+
+## Run it with your own taste
+
+You can describe your own taste in a small file and get recommendations
+from it. Steps:
+
+1. Download MovieLens (once): `python3 data/download_movielens.py`
+2. Download the IMDb data (once, several hundred MB, takes a few minutes):
+   `python3 data/download_imdb.py`
+3. Copy the example and edit it: `cp personas/example.json personas/me.json`.
+   Every field is explained in `personas/README.md`.
+4. Run it: `python3 -m src.pipeline --persona-file personas/me.json`
+5. Open the CSV it saved in `results/` (the path is printed at the end).
+
+What you get: a readable top 15 (rank, title, year, IMDb rating, director,
+top cast, score, badge, reason), the full list in the CSV, a filter report
+saying how many titles each of your rules removed (and which one to relax
+if the list is short), and a short "Warnings" section.
+
+Problems are handled in three levels. The run **stops with a clear error**
+only when the results would be meaningless (unreadable file, no name, no
+valid liked genre, backwards year range, a rating outside 0 to 10, no
+MovieLens data). It **warns and carries on** when one preference cannot be
+used (an unknown genre, a director or favourite title not found, with a
+"did you mean", or IMDb data not downloaded). A **single movie with missing
+data** is counted quietly, never one line per movie.
+
+Honest limits:
+- MovieLens small has only about 9,700 movies, mostly up to 2018. A year
+  range after 2018 will return almost nothing.
+- Movies only, no shows.
+- Stage 2 is still the mock scorer, so the scores show the architecture, not
+  a measured result from a trained model.
+- Cast is the top 5 billed actors and actresses. Documentaries often list
+  people as "self", so their cast can be empty.
+
+## How this project works
+
+For someone who does not code. Think of the engine as a funnel.
+
+1. **Know the movies.** MovieLens gives about 9,700 real movies with
+   genres and ratings. IMDb data (optional) adds a rating, directors and cast.
+2. **Know the person.** A persona is a description of someone's taste: what
+   they like, dislike, and a few movies they love. Yours lives in a small
+   JSON file. If you give no favourite movies, a believable history is made
+   from your liked genres, because the engine needs some history to learn from.
+3. **Find many candidates.** Nine small "finders" each suggest titles from a
+   different angle (similar genres, what similar people watched, what is
+   popular, your favourite directors, and so on).
+4. **Remove what must never appear.** Already seen, wrong years, rated too
+   low, or with someone you never want to see. These are rules, so they
+   always win.
+5. **Rank what is left.** A scorer (a mock stand in, not a real AI model yet)
+   gives each title a score out of 100. Disliked genres only lower a score a
+   little, because a dislike is a lean, not a rule.
+6. **Show and keep the result.** You get a short list on screen, the full list
+   in a spreadsheet file, a note on what each rule removed, and a short list
+   of warnings.
+
+If something is missing or wrong, the engine tells you once, in plain words,
+and keeps going unless the answer would be meaningless.
 
 ## Sample results
 
@@ -543,6 +628,10 @@ Movie data, F. Maxwell Harper and Joseph A. Konstan. 2015. The
 MovieLens Datasets, History and Context. ACM Transactions on
 Interactive Intelligent Systems, GroupLens Research, University of
 Minnesota. Dataset available at https://grouplens.org/datasets/movielens/
+
+Ratings, directors and cast (optional): Information courtesy of IMDb
+(https://www.imdb.com). Used with permission. IMDb datasets are for personal
+and non commercial use only, see `data/README.md`.
 
 ## What would change with real JEV access
 

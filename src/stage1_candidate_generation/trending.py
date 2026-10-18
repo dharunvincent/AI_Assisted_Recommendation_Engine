@@ -1,7 +1,7 @@
 """
 src/stage1_candidate_generation/trending.py
 
-GENERATOR 4 of 8: Popularity and trending
+GENERATOR 4 of 9: Popularity and trending
 
 In a real streaming platform, this generator would call services like
 JustWatch or TMDB to see what is trending across the whole internet, not
