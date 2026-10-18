@@ -228,3 +228,13 @@ TASTE_BIAS_PEOPLE_CAP = 0.16
 # -----------------------------------------------------------------------
 PRINTED_RESULT_COUNT = 15
 SHORT_LIST_WARNING_BELOW = 15
+
+# -----------------------------------------------------------------------
+# PEOPLE GENERATOR: SLOTS PER PREFERRED PERSON
+# Each preferred director or actor gets up to this many candidate titles,
+# and the generator takes turns between them. With one shared cap, the most
+# voted person took every slot (three Nolan blockbusters pushed out all of
+# Michael Mann's films). A title that matches two preferred people is listed
+# once and counts towards both of them.
+# -----------------------------------------------------------------------
+PEOPLE_CANDIDATES_PER_PERSON = 5

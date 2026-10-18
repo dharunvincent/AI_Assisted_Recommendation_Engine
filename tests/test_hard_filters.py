@@ -7,7 +7,7 @@ nothing when the persona has not set it. Tiny hand made data, no downloads.
 
 import unittest
 
-from src.exclusion_filter.exclude import apply_hard_filters, exclude
+from src.exclusion_filter.exclude import apply_hard_filters, build_removal_check, exclude
 
 
 def movie(movie_id, year=2000, rating=8.0, votes=5000, directors=(), cast=(),
@@ -91,6 +91,19 @@ class DislikedGenresStaySoftTests(unittest.TestCase):
         animated = movie(1)
         animated["genres"] = ["Animation"]
         self.assertEqual(kept_ids([animated], user(disliked_genres=["Animation"])), [1])
+
+
+class RemovalCheckTests(unittest.TestCase):
+    def test_check_agrees_with_the_filters_title_by_title(self):
+        movies = [movie(1, year=1980), movie(2, rating=5.0), movie(3), movie(4, cast=["X"])]
+        persona = user(year_from=1990, min_imdb_rating=7.0, avoided_cast=["X"])
+        would_remove = build_removal_check(persona)
+        removed = [m["movie_id"] for m in movies if would_remove(m["movie_id"], m)]
+        self.assertEqual(removed, [1, 2, 4])
+        self.assertEqual(kept_ids(movies, persona), [3])
+
+    def test_check_removes_nothing_for_a_user_with_no_rules(self):
+        self.assertFalse(build_removal_check(user())(1, movie(1)))
 
 
 class FilterRulesTests(unittest.TestCase):
