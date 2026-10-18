@@ -141,6 +141,15 @@ DISLIKE_SCORE_CAP = 3.0
 # total. This single value keeps the total animation penalty about as strong
 # as before.
 DISLIKE_PENALTY_SCALE = 0.55
+# The dislike SCORE can grow to DISLIKE_SCORE_CAP (3.0) after repeated early
+# exits. Multiplied by the scale that is 1.65, more than all of taste fit, so
+# every title in that genre was pushed to a taste fit of 0 and the whole genre
+# vanished. The penalty therefore only reads the score up to this strength,
+# which is one explicit thumbs down (SIGNAL_WEIGHT_EXPLICIT_THUMBS_DOWN). The
+# biggest possible penalty is then 1.0 x 0.55 = 0.55 of taste fit, never all of
+# it. The stored score and its decay are not touched, only how much of it the
+# penalty is allowed to use.
+DISLIKE_STRENGTH_CAP_FOR_PENALTY = 1.0
 # If the override question answers "show anyway" with at least this much
 # confidence, the penalty is mostly lifted for that one title.
 OVERRIDE_CONFIDENCE_THRESHOLD = 0.65

@@ -26,6 +26,8 @@ from config.weights import (
     DISLIKE_PENALTY_SCALE,
     OVERRIDE_PENALTY_RETAINED,
     OVERRIDE_CONFIDENCE_THRESHOLD,
+    DISLIKE_STRENGTH_CAP_FOR_PENALTY,
+    DISLIKE_SCORE_CAP,
 )
 
 TASTE, COMPLETION, CONTEXT = 0.8, 0.6, 0.5  # the fixed answers used in most tests
@@ -102,6 +104,30 @@ class TestDislikePenalty(unittest.TestCase):
         result = rank_one(answers, dislike_scores={"Horror": penalty})
         self.assertEqual(result["final_score"], expected_final_score(TASTE - penalty * DISLIKE_PENALTY_SCALE))
         self.assertFalse(result["dislike_override_used"])
+
+    def test_dislike_score_above_the_cap_costs_the_same_as_the_cap(self):
+        # Rule: the penalty never exceeds CAP x SCALE of taste fit, however high the stored score is.
+        at_cap = rank_one(fixed_answers(), dislike_scores={"Horror": DISLIKE_STRENGTH_CAP_FOR_PENALTY})
+        way_above = rank_one(fixed_answers(), dislike_scores={"Horror": DISLIKE_SCORE_CAP})
+        self.assertEqual(at_cap["final_score"], way_above["final_score"])
+        self.assertEqual(
+            way_above["final_score"],
+            expected_final_score(TASTE - DISLIKE_STRENGTH_CAP_FOR_PENALTY * DISLIKE_PENALTY_SCALE),
+        )
+
+    def test_biggest_score_no_longer_wipes_out_taste_fit(self):
+        result = rank_one(fixed_answers(taste=0.7), dislike_scores={"Horror": DISLIKE_SCORE_CAP})
+        self.assertGreater(result["diagnostics"]["taste_fit_after_penalty"], 0.0)
+
+    def test_score_below_the_cap_is_not_changed(self):
+        result = rank_one(fixed_answers(), dislike_scores={"Horror": 0.5})
+        self.assertEqual(result["final_score"], expected_final_score(TASTE - 0.5 * DISLIKE_PENALTY_SCALE))
+
+    def test_override_also_works_from_the_capped_strength(self):
+        answers = fixed_answers(override="override_show_anyway", override_confidence=CONFIDENT)
+        result = rank_one(answers, dislike_scores={"Horror": DISLIKE_SCORE_CAP})
+        retained = DISLIKE_STRENGTH_CAP_FOR_PENALTY * OVERRIDE_PENALTY_RETAINED
+        self.assertEqual(result["final_score"], expected_final_score(TASTE - retained * DISLIKE_PENALTY_SCALE))
 
 
 class TestBusinessWeight(unittest.TestCase):

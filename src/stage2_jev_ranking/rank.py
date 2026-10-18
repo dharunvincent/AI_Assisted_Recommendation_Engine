@@ -31,6 +31,7 @@ from config.weights import (
     BUSINESS_WEIGHT_NEUTRAL,
     LIKED_COMPLETION_THRESHOLD,
     DISLIKE_PENALTY_SCALE,
+    DISLIKE_STRENGTH_CAP_FOR_PENALTY,
     OVERRIDE_CONFIDENCE_THRESHOLD,
     OVERRIDE_PENALTY_RETAINED,
 )
@@ -107,11 +108,14 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
         override_used = False
 
         if dislike_penalty > 0:
+            # Cap first, so the override then softens a penalty that already
+            # cannot be bigger than one thumbs down.
+            penalty_strength = min(dislike_penalty, DISLIKE_STRENGTH_CAP_FOR_PENALTY)
             if override_answer == "override_show_anyway" and override_confidence >= OVERRIDE_CONFIDENCE_THRESHOLD:
-                effective_penalty = dislike_penalty * OVERRIDE_PENALTY_RETAINED  # mostly overruled
+                effective_penalty = penalty_strength * OVERRIDE_PENALTY_RETAINED  # mostly overruled
                 override_used = True
             else:
-                effective_penalty = dislike_penalty  # penalty stands
+                effective_penalty = penalty_strength  # penalty stands
             taste_fit_score = max(0.0, taste_fit_score - (effective_penalty * DISLIKE_PENALTY_SCALE))
 
         completion_score = jev_answers["completion_likelihood"]["answer"]
