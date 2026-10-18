@@ -1,0 +1,79 @@
+Loading MovieLens catalog ...
+Loaded 9742 titles.
+
+=== Recommendations for Arjun (persona_01) ===
+Persona taste: loves car and racing action movies, dislikes animated movies even when the subject is cars
+- Fight Club (1999) | 93.6% match | similar genre to titles you watched, Action
+- Matrix, The (1999) | no badge, 84.6% match, below 85% | similar genre to titles you watched, Action
+- The Raid: Redemption (2011) | 90.5% match | other viewers with similar taste also watched this
+- Jurassic Park (1993) | no badge, 84.9% match, below 85% | similar genre to titles you watched, Action
+- Braveheart (1995) | no badge, 78.3% match, below 85% | similar genre to titles you watched, Action
+- Shawshank Redemption, The (1994) | 87.0% match | trending now
+- Star Wars: Episode IV - A New Hope (1977) | no badge, 77.0% match, below 85% | similar genre to titles you watched, Action
+- Silence of the Lambs, The (1991) | no badge, 81.8% match, below 85% | trending now
+- Death Proof (2007) | no badge, 82.0% match, below 85% | other viewers with similar taste also watched this
+- Supercop 2 (Project S) (Chao ji ji hua) (1993) | no badge, 81.8% match, below 85% [dislike override used] | popular among the 25 to 34 age group
+- Star Wars: Episode VI - Return of the Jedi (1983) | no badge, 79.0% match, below 85% | similar genre to titles you watched, Action
+- Assignment, The (1997) | no badge, 78.8% match, below 85% | popular among the 25 to 34 age group
+- Independence Day (a.k.a. ID4) (1996) | no badge, 75.3% match, below 85% | similar genre to titles you watched, Action
+- Four Days in September (O Que É Isso, Companheiro?) (1997) | no badge, 77.7% match, below 85% | popular among the 25 to 34 age group
+- Saving Private Ryan (1998) | no badge, 80.3% match, below 85% | similar genre to titles you watched, Action
+  why 'Fight Club' is on top: taste fit 0.922, completion likelihood 0.962, context fit 0.874
+
+=== Recommendations for Meera (persona_02) ===
+Persona taste: loves comedy and romance, mostly light background watching
+- Fight Club (1999) | 93.0% match | other viewers with similar taste also watched this
+- Jurassic Park (1993) | 93.8% match | trending now
+- What Happened Was... (1994) | 100.0% match | popular among the 18 to 24 age group
+- Supercop 2 (Project S) (Chao ji ji hua) (1993) | 94.4% match | popular among the 18 to 24 age group
+- Toy Story (1995) | no badge, 83.3% match, below 85% | similar genre to titles you watched, Comedy
+- All the Vermeers in New York (1990) | 93.2% match | popular among the 18 to 24 age group
+- Independence Day (a.k.a. ID4) (1996) | 86.7% match | trending now
+- Raiders of the Lost Ark (Indiana Jones and the Raiders of the Lost Ark) (1981) | no badge, 84.3% match, below 85% | other viewers with similar taste also watched this
+- Shrek (2001) | 90.0% match | similar genre to titles you watched, Comedy, Romance
+- Good Will Hunting (1997) | 87.7% match | similar genre to titles you watched, Romance
+- Forrest Gump (1994) | 87.9% match | similar genre to titles you watched, Comedy, Romance
+- Usual Suspects, The (1995) | no badge, 82.3% match, below 85% | other viewers with similar taste also watched this
+- Assignment, The (1997) | 86.5% match | popular among the 18 to 24 age group
+- Braveheart (1995) | no badge, 81.7% match, below 85% | trending now
+- Silence of the Lambs, The (1991) | no badge, 77.1% match, below 85% | other viewers with similar taste also watched this
+  why 'Fight Club' is on top: taste fit 0.921, completion likelihood 0.947, context fit 0.768
+
+=== Recommendations for Thomas (persona_03) ===
+Persona taste: prefers drama and documentary, finishes almost everything they start
+- Inception (2010) | 98.6% match | other viewers with similar taste also watched this
+- Matrix, The (1999) | 92.6% match | other viewers with similar taste also watched this
+- What Happened Was... (1994) | 92.3% match | popular among the 45 plus age group
+- Jurassic Park (1993) | no badge, 83.9% match, below 85% | trending now
+- Star Wars: Episode V - The Empire Strikes Back (1980) | no badge, 80.9% match, below 85% | trending now
+- Star Wars: Episode IV - A New Hope (1977) | no badge, 79.7% match, below 85% | trending now
+- Departed, The (2006) | 87.9% match | other viewers with similar taste also watched this
+- Braveheart (1995) | no badge, 80.9% match, below 85% | similar genre to titles you watched, Drama
+- Silence of the Lambs, The (1991) | no badge, 75.7% match, below 85% | other viewers with similar taste also watched this
+- Pulp Fiction (1994) | no badge, 76.3% match, below 85% | similar genre to titles you watched, Drama
+- American Beauty (1999) | no badge, 83.2% match, below 85% | similar genre to titles you watched, Drama
+- Forrest Gump (1994) | 85.0% match | similar genre to titles you watched, Drama
+- In the Realm of the Senses (Ai no corrida) (1976) | no badge, 81.7% match, below 85% | popular among the 45 plus age group
+- Usual Suspects, The (1995) | no badge, 74.9% match, below 85% | other viewers with similar taste also watched this
+- Fargo (1996) | no badge, 80.1% match, below 85% | similar genre to titles you watched, Drama
+  why 'Inception' is on top: taste fit 1.0, completion likelihood 0.96, context fit 0.485
+
+=== Recommendations for Dharun (persona_04) ===
+Persona taste: likes action, thriller, documentary and comedy, dislikes animation, avoids anything rated below 6 out of 10
+- Star Wars: Episode VI - Return of the Jedi (1983) | 88.7% match | avg rating 4.14 of 5 | fits a weekend evening viewing moment
+- Toy Story (1995) | no badge, 83.2% match, below 85% [dislike override used] | avg rating 3.92 of 5 | similar genre to titles you watched, Comedy
+- Forrest Gump (1994) | 94.5% match | avg rating 4.16 of 5 | similar genre to titles you watched, Comedy
+- Star Wars: Episode V - The Empire Strikes Back (1980) | 87.6% match | avg rating 4.22 of 5 | other viewers with similar taste also watched this
+- Fargo (1996) | 91.9% match | avg rating 4.12 of 5 | similar genre to titles you watched, Comedy, Thriller
+- Shawshank Redemption, The (1994) | 90.1% match | avg rating 4.43 of 5 | trending now
+- Eternal Sunshine of the Spotless Mind (2004) | 89.1% match | avg rating 4.16 of 5 | other viewers with similar taste also watched this
+- Pulp Fiction (1994) | no badge, 84.0% match, below 85% | avg rating 4.2 of 5 | similar genre to titles you watched, Comedy, Thriller
+- Jurassic Park (1993) | 85.3% match | avg rating 3.75 of 5 | similar genre to titles you watched, Action, Thriller
+- Star Wars: Episode IV - A New Hope (1977) | 86.0% match | avg rating 4.23 of 5 | similar genre to titles you watched, Action
+- Independence Day (a.k.a. ID4) (1996) | 86.0% match | avg rating 3.45 of 5 | trending now
+- Braveheart (1995) | no badge, 79.9% match, below 85% | avg rating 4.03 of 5 | similar genre to titles you watched, Action
+- Being John Malkovich (1999) | 89.5% match | avg rating 3.95 of 5 | other viewers with similar taste also watched this
+- Memento (2000) | 87.9% match | avg rating 4.12 of 5 | other viewers with similar taste also watched this
+- Usual Suspects, The (1995) | no badge, 76.9% match, below 85% | avg rating 4.24 of 5 | similar genre to titles you watched, Thriller
+  dislike check: 1 of the top 15 carry a disliked genre, Toy Story
+  why 'Star Wars: Episode VI - Return of the Jedi' is on top: taste fit 0.976, completion likelihood 0.721, context fit 0.895
