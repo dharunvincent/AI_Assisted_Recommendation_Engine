@@ -90,6 +90,42 @@ def format_result_table(rows: List[Dict[str, Any]]) -> List[str]:
     ]
 
 
+def format_launcher_table(rows: List[Dict[str, Any]]) -> List[str]:
+    """
+    The table of the `recommend` launcher: every row, numbers right aligned,
+    a divider under the header. Separate from format_result_table on purpose,
+    so the output of the older commands never changes.
+    """
+    header = ["Rank", "Title", "Year", "IMDb", "Match", "Badge", "Main reason"]
+    body = [
+        [
+            str(row["rank"]), row["title"], str(row["year"]),
+            str(row["imdb_rating"]) if row["imdb_rating"] != "" else "n/a",
+            f"{row['final_score']:g}%", BADGE_MARK if row["badge"] == "yes" else "",
+            row["main_reason"],
+        ]
+        for row in rows
+    ]
+    widths = [max(len(line[i]) for line in [header] + body) for i in range(len(header) - 1)]
+    right_aligned = {0, 2, 3, 4}  # rank, year, IMDb, match
+
+    def render(line: List[str]) -> str:
+        cells = [
+            cell.rjust(width) if i in right_aligned else cell.ljust(width)
+            for i, (cell, width) in enumerate(zip(line, widths))
+        ]
+        return "  ".join(cells + [line[-1]]).rstrip()
+
+    divider = "  ".join("-" * width for width in widths) + "  " + "-" * len(header[-1])
+    return [render(header), divider] + [render(line) for line in body]
+
+
+def badge_summary_line(rows: List[Dict[str, Any]]) -> str:
+    """Pure: "X of Y movies earned the badge."."""
+    earned = sum(1 for row in rows if row["badge"] == "yes")
+    return f"{earned} of {len(rows)} movies earned the badge."
+
+
 def format_filter_report(
     removed_counts: Dict[str, int], candidate_count: int, final_count: int
 ) -> List[str]:

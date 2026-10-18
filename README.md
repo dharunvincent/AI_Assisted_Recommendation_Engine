@@ -325,52 +325,47 @@ AI_Assisted_Recommendation_Engine/
     └── test_results_report.py     Tests for the printed list, the CSV and the filter report
 ```
 
-## How to run this project
-
-1. Install Python 3.9 or newer.
-2. From inside the `AI_Assisted_Recommendation_Engine` folder, download
-   the real movie data:
-   ```
-   python data/download_movielens.py
-   ```
-3. Run the full pipeline:
-   ```
-   python -m src.pipeline
-   ```
-   This prints a ranked, scored recommendation list for each of the
-   four synthetic personas. To run just one, add `--persona` and a
-   first name, for example `python -m src.pipeline --persona dharun`.
-4. Optional, run all the tests:
-   ```
-   python -m unittest discover tests
-   ```
-5. Optional, run the offline evaluation (see the Evaluation section):
-   ```
-   python -m src.evaluate
-   ```
-
-No API keys and no paid services are needed to run this project.
-
-## Run it live in 2 minutes
-
-From the project's root folder:
+## Run it in one word
 
 ```
-python3 data/download_movielens.py                      # once
-python3 data/download_imdb.py                           # once, optional, adds ratings, directors, cast
-python3 -m src.pipeline --interactive                   # answer the questions
-python3 -m src.pipeline --interactive --top 10          # only the first 10 movies
-python3 -m src.pipeline --persona-file personas/example.json --badged-only
+recommend
 ```
 
-Interactive mode asks one question at a time (name, genres, rating, years,
-directors, cast, favourite movies). Press Enter to skip an optional one. A
-wrong answer is explained and asked again, and a name that is not found
-offers a "did you mean" you accept with `y`. At the end you confirm with
-`y`, your answers are saved to `personas/<name>.json` (not committed to git)
-and the engine runs. Both ways of running show every ranked movie with a
-✓ badge for a score of 72 or above. `--badged-only` shows only those and
-`--top N` shows only the first N. The CSV in `results/` always has them all.
+That is all. Type it in any Terminal folder (it needs Python 3.9 or newer, and
+the one time setup below). It first asks:
+
+1. **Use a ready made persona** picks one of the four built in personas, or one
+   of your saved `personas/*.json` files, and goes straight to the results.
+2. **Enter your own preferences** asks one plain English question at a time.
+   Only the genres you like are required, press Enter to skip the rest. A
+   wrong answer is explained and asked again, and a name that is not found
+   offers a "did you mean" you accept with `y`.
+
+Then you see a short summary and type `go` (show recommendations), `redo`
+(start the questions over) or `quit` (exit, nothing saved). Press Ctrl+C at
+any time to stop, nothing is saved.
+
+The results are one table with every ranked movie: rank, title, year, IMDb
+rating, match %, a ✓ badge for 72 or above, and the main reason. Your answers
+are saved to `personas/<name>.json` and the results to `results/*.csv`,
+neither is committed to git.
+
+One time setup, from the project folder:
+
+```
+python3 data/download_movielens.py     # the movies
+python3 data/download_imdb.py          # ratings, directors, cast
+echo 'alias recommend="'"$PWD"'/recommend"' >> ~/.zshrc   # then open a new Terminal window
+```
+
+If a download is missing, `recommend` says which one and the exact command to
+fix it. Other commands:
+
+```
+python3 -m src.pipeline               # the four built in personas, plain output
+python3 -m src.evaluate               # offline evaluation (see Evaluation)
+python3 -m unittest discover tests    # all the tests
+```
 
 ## Run it with your own taste
 

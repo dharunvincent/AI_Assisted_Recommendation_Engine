@@ -51,9 +51,12 @@ def split_answer(text: str) -> List[str]:
     return [part.strip() for part in text.split(",") if part.strip()]
 
 
+DEFAULT_NAME = "me"  # used when the name question is skipped, only liked genres is required
+
+
 def parse_name(text: str) -> Parsed:
-    name = text.strip()
-    return Parsed(name, None) if name else Parsed(None, "A name is needed, please type one.")
+    """Never refuses: Enter means the default name, so the file is saved as personas/me.json."""
+    return Parsed(text.strip() or DEFAULT_NAME, None)
 
 
 def parse_genres(text: str, valid_genres: List[str], field: str, required: bool) -> Parsed:
@@ -186,15 +189,18 @@ def _ask_limits(ask: Ask, say: Say, imdb_ready: bool) -> Dict[str, Optional[floa
     return limits
 
 
-def interview(ask: Ask, say: Say, catalog: Catalog) -> Optional[Dict[str, Any]]:
+def interview(ask: Ask, say: Say, catalog: Catalog, confirm: bool = True) -> Optional[Dict[str, Any]]:
     """
-    Asks every question, shows the summary and asks "Run with these? (y/n)".
+    Asks every question. With confirm=True (the --interactive command) it also
+    shows the summary and asks "Run with these? (y/n)". With confirm=False
+    (the recommend launcher) it returns right after the last question, because
+    the launcher shows its own summary and go / redo / quit choice.
     Returns the persona dict, or None when the user said n or the input ended.
     """
     genres = valid_genres_in(catalog)
     imdb_ready = catalog_has_imdb_data(catalog)
     try:
-        name = _ask_until_valid(ask, say, "What is your name? ", parse_name)
+        name = _ask_until_valid(ask, say, "What is your name? (Enter to skip) ", parse_name)
         say(f"Valid genres: {', '.join(genres)}")
         liked = _ask_until_valid(
             ask, say, "Genres you like (comma separated): ",
@@ -221,6 +227,8 @@ def interview(ask: Ask, say: Say, catalog: Catalog) -> Optional[Dict[str, Any]]:
             "name": name, "liked_genres": liked, "disliked_genres": disliked, **limits, **people,
             "favourite_titles": favourites,
         }
+        if not confirm:
+            return data
         for line in format_summary(data):
             say(line)
         return data if _confirm(ask, say, "Run with these? (y/n) ") else None
