@@ -209,3 +209,13 @@ MAX_SUGGESTIONS = 3
 # MovieLens floor. A title with no IMDb rating at all is removed too.
 # -----------------------------------------------------------------------
 MIN_IMDB_VOTES_FOR_FLOOR = 1000
+
+# -----------------------------------------------------------------------
+# PREFERRED DIRECTORS AND CAST: TASTE BIAS
+# Every preferred director or actor found in a title raises the expected
+# taste fit (see TASTE_BIAS_BASE above) by this much, up to a cap. The cap
+# stops a title with three favourite actors from beating everything on cast
+# alone: genre match and the other questions should still matter.
+# -----------------------------------------------------------------------
+TASTE_BIAS_PER_PREFERRED_PERSON = 0.08
+TASTE_BIAS_PEOPLE_CAP = 0.16

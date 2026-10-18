@@ -8,7 +8,7 @@ system work on the synthetic personas.
 Order of operations:
 1. Load the real MovieLens catalog
 2. Build synthetic persona users on top of it
-3. Run all eight stage 1 candidate generators
+3. Run all nine stage 1 candidate generators
 4. Merge their output into one shortlist
 5. Run the exclusion filter cleanup step
 6. Run stage 2 JEV ranking (mocked) to score and sort the shortlist
@@ -41,6 +41,7 @@ from src.stage1_candidate_generation import (
     session_based,
     business_rules,
     diversity,
+    people_based,
 )
 from src.stage1_candidate_generation.merge_shortlist import merge
 from config.weights import (
@@ -52,7 +53,7 @@ from config.weights import (
 
 def run_generators(user, catalog, context, similarity_table=None):
     """
-    Runs all eight generators one after another. Returns a dict of generator
+    Runs all nine generators one after another. Returns a dict of generator
     name mapped to that generator's own candidate list, in running order.
     similarity_table lets the evaluation hand collaborative filtering a table
     that was built without the held out ratings, see src/evaluate.py.
@@ -73,6 +74,9 @@ def run_generators(user, catalog, context, similarity_table=None):
         "session_based": lambda: session_based.generate(user, catalog),
         "business_rules": lambda: business_rules.generate(user, catalog),
         "diversity": lambda: diversity.generate(user, catalog, random_seed=7),
+        # Last on purpose: it returns nothing for users without preferred people,
+        # so it never changes the result for the four built in personas.
+        "people_based": lambda: people_based.generate(user, catalog),
     }
 
     return {name: job() for name, job in jobs.items()}

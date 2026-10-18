@@ -1,7 +1,7 @@
 """
 src/stage1_candidate_generation/content_based.py
 
-GENERATOR 1 of 8: Content based filtering
+GENERATOR 1 of 9: Content based filtering
 
 Looks at the genres of movies the user has watched and liked, and finds
 other movies in the catalog that share those genres. This is the most

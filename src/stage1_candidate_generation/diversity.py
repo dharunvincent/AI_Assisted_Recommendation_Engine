@@ -1,7 +1,7 @@
 """
 src/stage1_candidate_generation/diversity.py
 
-GENERATOR 8 of 8: Diversity injection
+GENERATOR 8 of 9: Diversity injection
 
 All seven other generators chase similarity, similar genre, similar
 taste, similar session. If we only ever show a user more of the same,

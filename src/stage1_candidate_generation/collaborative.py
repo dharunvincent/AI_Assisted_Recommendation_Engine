@@ -1,7 +1,7 @@
 """
 src/stage1_candidate_generation/collaborative.py
 
-GENERATOR 2 of 8: Collaborative filtering (item based)
+GENERATOR 2 of 9: Collaborative filtering (item based)
 
 This generator uses the real MovieLens ratings data from hundreds of
 real anonymous users to find patterns like "people who rated movie A
