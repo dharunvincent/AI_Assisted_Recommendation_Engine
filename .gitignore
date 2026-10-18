@@ -5,3 +5,10 @@ venv/
 data/ml-latest-small/
 data/ml-latest-small.zip
 .DS_Store
+# IMDb data (see data/download_imdb.py), not ours to redistribute
+data/imdb_raw/
+data/*.tsv.gz
+data/imdb_enriched.csv
+data/imdb_enriched.csv.tmp
+# Personal results files
+results/
