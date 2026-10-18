@@ -33,6 +33,7 @@ Honest limits, please read:
 - The dataset is small (about 600 users), so the numbers are noisy.
 """
 
+import argparse
 import csv
 import os
 import random
@@ -172,7 +173,60 @@ def share(part, whole):
     return part / whole if whole else 0.0
 
 
-def evaluate():
+def describe_ranked_item(item, rank):
+    """
+    Pure. One diagnostic row for a ranked title, flattening the numbers
+    rank.py keeps in item["diagnostics"] plus the JEV answers.
+    """
+    numbers = item["diagnostics"]
+    return {
+        "movie_id": item["movie_id"],
+        "rank": rank,
+        "sources": list(item["sources"]),
+        "genre_overlap_count": numbers["genre_overlap_count"],
+        "taste_fit_before_penalty": numbers["taste_fit_before_penalty"],
+        "taste_fit_after_penalty": numbers["taste_fit_after_penalty"],
+        "dislike_penalty": numbers["dislike_penalty"],
+        "override_fired": item["dislike_override_used"],
+        "completion": item["jev_answers"]["completion_likelihood"]["answer"],
+        "context": item["jev_answers"]["context_fit"]["answer"],
+        # Zero from the penalty only: a title whose taste fit was already 0 is not counted.
+        "pushed_to_zero": (
+            numbers["taste_fit_after_penalty"] == 0.0 and numbers["taste_fit_before_penalty"] > 0.0
+        ),
+        "bias_capped": numbers["taste_bias_before_cap"] > 1.0,
+    }
+
+
+def average(numbers):
+    return sum(numbers) / len(numbers) if numbers else None
+
+
+def summarize_diagnostics(hidden_rows, shortlisted_count, pushed_to_zero_count, bias_capped_count):
+    """
+    Pure. hidden_rows are describe_ranked_item rows for hidden answers that
+    reached the shortlist. The two counts cover EVERY shortlisted title of
+    every tested user, not only the hidden answers.
+    """
+    in_top = [row for row in hidden_rows if row["rank"] <= TOP_K]
+    from_collaborative = [row for row in hidden_rows if "collaborative" in row["sources"]]
+    return {
+        "shortlisted_answers": len(hidden_rows),
+        "average_rank_of_shortlisted_answers": average([row["rank"] for row in hidden_rows]),
+        "answers_in_top": len(in_top),
+        "average_rank_of_answers_in_top": average([row["rank"] for row in in_top]),
+        "shortlisted_titles": shortlisted_count,
+        "pushed_to_zero": pushed_to_zero_count,
+        "bias_capped": bias_capped_count,
+        "collaborative_answers": len(from_collaborative),
+        "collaborative_in_top": sum(row["rank"] <= TOP_K for row in from_collaborative),
+        "collaborative_hit_rate": share(
+            sum(row["rank"] <= TOP_K for row in from_collaborative), len(from_collaborative)
+        ),
+    }
+
+
+def evaluate(diagnose=False):
     catalog = load_catalog()
     test_users = pick_test_users(read_ratings_by_user())
 
@@ -189,6 +243,8 @@ def evaluate():
     generator_hits = defaultdict(int)
     stage2_hits = stage2_users_with_a_hit = 0
     popular_hits = popular_users_with_a_hit = 0
+    hidden_rows = []
+    shortlisted_count = pushed_to_zero_count = bias_capped_count = 0
 
     for user_id, history, held_out in test_users:
         answers = {movie_id for _, movie_id, _ in held_out}
@@ -208,12 +264,21 @@ def evaluate():
         stage2_hits += len(answers & top_ranked)
         stage2_users_with_a_hit += bool(answers & top_ranked)
 
+        if diagnose:
+            for position, item in enumerate(stages["ranked"], start=1):
+                row = describe_ranked_item(item, position)
+                shortlisted_count += 1
+                pushed_to_zero_count += row["pushed_to_zero"]
+                bias_capped_count += row["bias_capped"]
+                if item["movie_id"] in answers:
+                    hidden_rows.append(row)
+
         popular = set(most_popular_titles(catalog, {m for _, m, _ in history}, TOP_K))
         popular_hits += len(answers & popular)
         popular_users_with_a_hit += bool(answers & popular)
 
     user_count = len(test_users)
-    return {
+    results = {
         "users": user_count,
         "answers": total_answers,
         "stage1_recall": share(shortlist_hits, total_answers),
@@ -223,6 +288,14 @@ def evaluate():
         "popular_hit_rate": share(popular_users_with_a_hit, user_count),
         "popular_recall": share(popular_hits, total_answers),
     }
+    if diagnose:
+        results["diagnostics"] = {
+            "rows": hidden_rows,
+            "summary": summarize_diagnostics(
+                hidden_rows, shortlisted_count, pushed_to_zero_count, bias_capped_count
+            ),
+        }
+    return results
 
 
 def print_report(results):
@@ -240,5 +313,46 @@ def print_report(results):
     print("hidden ratings, a small known leak that also helps the popularity baseline.")
 
 
+def print_diagnostics(diagnostics):
+    summary = diagnostics["summary"]
+    print("\nDiagnosis: every hidden answer that reached the shortlist")
+    print(f"  {'Rank':>4}  {'Overlap':>7}  {'Taste before':>12}  {'Taste after':>11}  "
+          f"{'Penalty':>7}  {'Override':>8}  {'Compl.':>6}  {'Ctx':>5}  Sources")
+    for row in sorted(diagnostics["rows"], key=lambda r: r["rank"]):
+        print(f"  {row['rank']:>4}  {row['genre_overlap_count']:>7}  {row['taste_fit_before_penalty']:>12.3f}  "
+              f"{row['taste_fit_after_penalty']:>11.3f}  {row['dislike_penalty']:>7.3f}  "
+              f"{'yes' if row['override_fired'] else 'no':>8}  {row['completion']:>6.3f}  "
+              f"{row['context']:>5.3f}  {', '.join(row['sources'])}")
+
+    def fmt(value):
+        return "n/a" if value is None else f"{value:.1f}"
+
+    print("\nDiagnosis summary")
+    print(f"  (a) Hidden answers on the shortlist: {summary['shortlisted_answers']}, "
+          f"average final rank {fmt(summary['average_rank_of_shortlisted_answers'])}. "
+          f"{summary['answers_in_top']} of them made the top {TOP_K} "
+          f"(average rank {fmt(summary['average_rank_of_answers_in_top'])}).")
+    print(f"  (b) Shortlisted titles with taste fit pushed to 0 by the dislike penalty: "
+          f"{summary['pushed_to_zero']} of {summary['shortlisted_titles']}")
+    print(f"  (c) Shortlisted titles with taste bias capped at 1.0: "
+          f"{summary['bias_capped']} of {summary['shortlisted_titles']}")
+    print(f"  (d) Hidden answers found by collaborative filtering that made the top {TOP_K}: "
+          f"{summary['collaborative_in_top']} of {summary['collaborative_answers']} "
+          f"({summary['collaborative_hit_rate']:.1%})")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Offline evaluation on real MovieLens users.")
+    parser.add_argument(
+        "--diagnose", action="store_true",
+        help="also print where each hidden answer ended up and why",
+    )
+    args = parser.parse_args()
+    results = evaluate(diagnose=args.diagnose)
+    print_report(results)
+    if args.diagnose:
+        print_diagnostics(results["diagnostics"])
+
+
 if __name__ == "__main__":
-    print_report(evaluate())
+    main()

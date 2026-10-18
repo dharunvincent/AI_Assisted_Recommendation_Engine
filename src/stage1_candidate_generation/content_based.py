@@ -117,17 +117,22 @@ def _pick_by_inferred_genres(user, watched_ids, catalog, max_candidates):
 
     favourite_genres = {genre for genre, _ in genre_counter.most_common(3)}
 
-    candidates = []
+    # Only titles with enough ratings to trust, otherwise the list fills
+    # with obscure films in catalog file order. Sorted by how many of the
+    # favourite genres the title really has (counted here, not read back
+    # from the reason text), then by how well known, then by average rating.
+    ranked = []
     for movie in catalog.values():
         if movie["movie_id"] in watched_ids:
             continue
+        if movie["rating_count"] < MIN_RATINGS_FOR_CONTENT_BASED:
+            continue
         overlap = favourite_genres.intersection(movie["genres"])
         if overlap:
-            candidates.append(_candidate(movie, overlap))
+            ranked.append((len(overlap), movie["rating_count"], movie["avg_rating"], movie, overlap))
 
-    # Prefer candidates with more genre overlap, and cap the list size.
-    candidates.sort(key=lambda c: c["reason"].count(","), reverse=True)
-    return candidates[:max_candidates]
+    ranked.sort(key=lambda entry: entry[:3], reverse=True)
+    return [_candidate(movie, overlap) for _, _, _, movie, overlap in ranked[:max_candidates]]
 
 
 def _candidate(movie, overlapping_genres):

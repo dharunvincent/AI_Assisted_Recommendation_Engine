@@ -9,8 +9,9 @@ movie in the shortlist it does the following:
 3. resolves the dislike override logic
 4. combines everything into one final score out of 100 using the
    weights locked in during planning (config/weights.py)
-5. decides whether the score badge should be shown, using the 72
-   percent threshold, without changing the ranking order itself
+5. works out the match percent shown to the user and decides whether the
+   badge is shown, using the 85 percent threshold on the match percent,
+   without changing the ranking order itself (that uses the final score)
 
 Remember, every JEV flavoured number here comes from a mock client. The
 final scores and the order of this list are a demonstration of the
@@ -24,6 +25,8 @@ from config.weights import (
     COMPLETION_LIKELIHOOD_WEIGHT,
     CONTEXT_FIT_WEIGHT,
     BUSINESS_WEIGHT_WEIGHT,
+    MATCH_TASTE_WEIGHT,
+    MATCH_COMPLETION_WEIGHT,
     BADGE_DISPLAY_THRESHOLD_PERCENT,
     BUSINESS_WEIGHT_NEUTRAL,
     LIKED_COMPLETION_THRESHOLD,
@@ -43,6 +46,18 @@ def _genre_overlap_count(user, catalog, movie):
     return len(liked_genres.intersection(movie["genres"]))
 
 
+def match_percent_for(taste_fit_after_penalty, completion_likelihood):
+    """
+    Pure. How well the title fits the PERSON, 0 to 100. Only taste fit (after
+    the dislike penalty) and completion count. Promotion and context fit are
+    left out on purpose, see MATCH_TASTE_WEIGHT in config/weights.py.
+    """
+    return round(
+        (taste_fit_after_penalty * MATCH_TASTE_WEIGHT + completion_likelihood * MATCH_COMPLETION_WEIGHT) * 100,
+        1,
+    )
+
+
 def rank_candidates(user, catalog, shortlist, context, dislike_scores):
     """
     dislike_scores: dict of genre mapped to dislike_score, already
@@ -50,7 +65,7 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
     user.
 
     Returns the shortlist, each candidate now carrying a final_score (0
-    to 100), a show_badge flag, and the raw JEV style answers for
+    to 100), a match_percent (0 to 100, shown to the user), a show_badge flag, and the raw JEV style answers for
     transparency, sorted by final_score, highest first.
     """
     ranked = []
@@ -80,6 +95,7 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
         # below, and ONLY there. Nowhere else in stage 2 subtracts it, so it
         # can never be counted twice.
         taste_fit_score = jev_answers["taste_fit"]["answer"]
+        taste_fit_before_penalty = taste_fit_score
 
         # Dislike override logic, if JEV's override question comes back
         # as override_show_anyway with reasonable confidence, we soften
@@ -113,6 +129,8 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
 
         final_score = round(final_score, 1)
 
+        match_percent = match_percent_for(taste_fit_score, completion_score)
+
         ranked.append({
             "movie_id": movie["movie_id"],
             "title": movie["title"],
@@ -122,9 +140,21 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
             "sources": candidate["sources"],
             "reasons": candidate["reasons"],
             "final_score": final_score,
-            "show_badge": final_score >= BADGE_DISPLAY_THRESHOLD_PERCENT,
+            "match_percent": match_percent,
+            "show_badge": match_percent >= BADGE_DISPLAY_THRESHOLD_PERCENT,
             "dislike_override_used": override_used,
             "jev_answers": jev_answers,
+            # Read only numbers for src/evaluate.py --diagnose. Nothing in
+            # the ranking reads them.
+            "diagnostics": {
+                "genre_overlap_count": genre_overlap_count,
+                "dislike_penalty": dislike_penalty,
+                "taste_fit_before_penalty": taste_fit_before_penalty,
+                "taste_fit_after_penalty": taste_fit_score,
+                "taste_bias_before_cap": scoring_questions.taste_bias(
+                    genre_overlap_count, len(preferred_people)
+                ),
+            },
         })
 
     ranked.sort(key=lambda item: item["final_score"], reverse=True)

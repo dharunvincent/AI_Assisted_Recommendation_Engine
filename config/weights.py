@@ -29,13 +29,32 @@ assert abs(
 ) < 1e-6, "The four stage 2 weights must add up to 1.0"
 
 # -----------------------------------------------------------------------
+# MATCH PERCENT SHOWN TO THE USER (separate from the ranking score)
+# The final score above decides the ORDER. It also contains promotion and
+# context fit, which say nothing about how well a title suits the person: a
+# normal title always loses the 15 promotion points and context fit sits near
+# 0.45, so the score never gets much above 74 and a promoted title could look
+# like a better match than it is. The match percent shown to the user is built
+# only from how well the title fits the person, taste fit after the dislike
+# penalty and completion likelihood. Taste gets the larger share because it is
+# the direct question "is this for me", completion is the supporting evidence.
+# These two must add up to 1.0.
+# -----------------------------------------------------------------------
+MATCH_TASTE_WEIGHT = 0.65
+MATCH_COMPLETION_WEIGHT = 0.35
+
+assert abs(
+    MATCH_TASTE_WEIGHT + MATCH_COMPLETION_WEIGHT - 1.0
+) < 1e-6, "The two match percent weights must add up to 1.0"
+
+# -----------------------------------------------------------------------
 # BADGE DISPLAY THRESHOLD
 # This does NOT affect ranking order. It only decides whether the
 # percentage match badge is shown on the content tile in the user
 # interface. Below this number, the content can still be recommended
 # and shown, it just will not carry a score badge on it.
 # -----------------------------------------------------------------------
-BADGE_DISPLAY_THRESHOLD_PERCENT = 72
+BADGE_DISPLAY_THRESHOLD_PERCENT = 85
 
 # -----------------------------------------------------------------------
 # DISLIKE SIGNAL BASE WEIGHTS
@@ -64,7 +83,7 @@ SIGNAL_HALF_LIFE_DAYS = 60
 # -----------------------------------------------------------------------
 # STAGE 1 SHORTLIST SIZE
 # How many candidates stage 1 hands over to stage 2 after merging and
-# removing duplicates from the output of all eight generators.
+# removing duplicates from the output of all nine generators.
 # -----------------------------------------------------------------------
 STAGE1_SHORTLIST_MIN_SIZE = 30
 STAGE1_SHORTLIST_MAX_SIZE = 50
@@ -155,6 +174,10 @@ OVERRIDE_MIN_GENRE_OVERLAP = 2
 COLLAB_HIGH_RATING_THRESHOLD = 4.0
 # Diversity injection only offers titles rated at least this well.
 DIVERSITY_MIN_AVG_RATING = 3.8
+# Diversity injection also needs this many ratings behind the average. Same
+# reason as MIN_RATINGS_FOR_QUALITY_FLOOR: an average of 4.5 from two raters
+# is luck, not quality, and a random pick would otherwise surface such titles.
+DIVERSITY_MIN_RATINGS = 20
 
 # -----------------------------------------------------------------------
 # BUSINESS WEIGHT: PROMOTION IS A SMALL NUDGE

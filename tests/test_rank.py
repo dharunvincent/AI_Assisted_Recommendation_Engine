@@ -13,8 +13,10 @@ Run with:  python3 -m unittest tests.test_rank
 import unittest
 from unittest.mock import patch
 
-from src.stage2_jev_ranking.rank import rank_candidates
+from src.stage2_jev_ranking.rank import rank_candidates, match_percent_for
 from config.weights import (
+    MATCH_TASTE_WEIGHT,
+    MATCH_COMPLETION_WEIGHT,
     TASTE_FIT_WEIGHT,
     COMPLETION_LIKELIHOOD_WEIGHT,
     CONTEXT_FIT_WEIGHT,
@@ -112,6 +114,35 @@ class TestBusinessWeight(unittest.TestCase):
         self.assertEqual(result["final_score"], expected_final_score(TASTE, business=0.4))
 
 
+class TestMatchPercent(unittest.TestCase):
+    def test_match_percent_is_the_taste_completion_blend(self):
+        result = rank_one(fixed_answers(), dislike_scores={})
+        self.assertEqual(
+            result["match_percent"],
+            round((TASTE * MATCH_TASTE_WEIGHT + COMPLETION * MATCH_COMPLETION_WEIGHT) * 100, 1),
+        )
+
+    def test_promoted_title_gets_the_same_match_percent_as_the_unpromoted_one(self):
+        plain = rank_one(fixed_answers(), dislike_scores={})
+        promoted = rank_one(fixed_answers(), dislike_scores={}, business_weight=0.5)
+        self.assertGreater(promoted["final_score"], plain["final_score"])  # ranking still sees the promotion
+        self.assertEqual(promoted["match_percent"], plain["match_percent"])
+
+    def test_context_fit_does_not_change_match_percent(self):
+        low = rank_one(fixed_answers(context=0.0), dislike_scores={})
+        high = rank_one(fixed_answers(context=1.0), dislike_scores={})
+        self.assertEqual(low["match_percent"], high["match_percent"])
+
+    def test_disliked_genre_title_gets_a_lower_match_percent(self):
+        liked = rank_one(fixed_answers(), dislike_scores={})
+        disliked = rank_one(fixed_answers(), dislike_scores={"Horror": 1.0})
+        self.assertLess(disliked["match_percent"], liked["match_percent"])
+
+    def test_match_percent_stays_between_0_and_100(self):
+        self.assertEqual(match_percent_for(0.0, 0.0), 0.0)
+        self.assertEqual(match_percent_for(1.0, 1.0), 100.0)
+
+
 class TestBadgeAndOrder(unittest.TestCase):
     def rank_with_uniform_scores(self, score_by_title):
         """Every answer, and the business weight, equal to the given score per title."""
@@ -130,6 +161,19 @@ class TestBadgeAndOrder(unittest.TestCase):
         badge_by_title = {item["title"]: item["show_badge"] for item in ranked}
         self.assertTrue(badge_by_title["Horror One"])    # exactly on the line gets the badge
         self.assertFalse(badge_by_title["Comedy Two"])   # just below does not
+
+    def test_badge_follows_match_percent_not_the_promoted_final_score(self):
+        # Same fit to the person; only one title is promoted. Promotion lifts
+        # its final score but must not decide the badge.
+        threshold = BADGE_DISPLAY_THRESHOLD_PERCENT / 100
+        answers = fixed_answers(taste=threshold, completion=threshold, context=0.0)
+        plain = rank_one(answers, dislike_scores={})
+        promoted = rank_one(answers, dislike_scores={}, business_weight=0.5)
+        self.assertTrue(plain["show_badge"])
+        self.assertTrue(promoted["show_badge"])
+        below = rank_one(fixed_answers(taste=threshold - 0.05, completion=threshold - 0.05, context=1.0),
+                         dislike_scores={}, business_weight=0.5)
+        self.assertFalse(below["show_badge"])  # a high final score cannot buy the badge
 
     def test_list_is_ordered_by_final_score_only(self):
         # The lower scoring title comes first in the shortlist on purpose.

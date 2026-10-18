@@ -70,6 +70,19 @@ def people_taste_boost(preferred_people_count):
     return min(preferred_people_count * TASTE_BIAS_PER_PREFERRED_PERSON, TASTE_BIAS_PEOPLE_CAP)
 
 
+def taste_bias(genre_overlap_count, preferred_people_count=0):
+    """
+    The expected taste fit BEFORE the mock clamps it to 0..1. A value above
+    1.0 means the mock cannot tell the title apart from a perfect fit, so
+    evaluate.py --diagnose counts those cases.
+    """
+    return (
+        TASTE_BIAS_BASE
+        + (genre_overlap_count * TASTE_BIAS_PER_GENRE_OVERLAP)
+        + people_taste_boost(preferred_people_count)
+    )
+
+
 def build_questions(
     movie, candidate, dislike_penalty, genre_overlap_count, preferred_people_count=0
 ):
@@ -83,11 +96,7 @@ def build_questions(
     # deliberately NOT part of this number. It is applied exactly once,
     # in rank.py, so that the override logic can soften it cleanly. If it
     # was also subtracted here, the override could never fully work.
-    taste_bias = (
-        TASTE_BIAS_BASE
-        + (genre_overlap_count * TASTE_BIAS_PER_GENRE_OVERLAP)
-        + people_taste_boost(preferred_people_count)
-    )
+    expected_taste = taste_bias(genre_overlap_count, preferred_people_count)
 
     # Rough expectation for completion likelihood, a well regarded movie
     # in the real MovieLens data is a reasonable proxy for "most people
@@ -106,7 +115,7 @@ def build_questions(
         "taste_fit": Score(
             "Ignoring any general dislike of this genre, how well does this "
             "match this user's personal taste?",
-            bias_hint=taste_bias,
+            bias_hint=expected_taste,
         ),
         "completion_likelihood": Score(
             "How likely is this user to finish watching this?",
