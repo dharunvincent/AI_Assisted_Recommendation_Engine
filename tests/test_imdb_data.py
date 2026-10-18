@@ -64,26 +64,45 @@ class BuildRowsTests(unittest.TestCase):
         self.assertEqual((summary.matched, summary.no_rating), (2, 1))
 
 
+def make_fake_movielens(folder):
+    """A tiny MovieLens folder (3 movies), so these tests never need the real download."""
+    files = {
+        "movies.csv": ["movieId,title,genres", "1,Toy Story (1995),Animation|Comedy",
+                       "2,Heat (1995),Action|Crime", "3,Obscure (2000),(no genres listed)"],
+        "ratings.csv": ["userId,movieId,rating,timestamp", "1,1,4.0,100", "2,1,5.0,200"],
+        "links.csv": ["movieId,imdbId,tmdbId", "1,0114709,862", "2,0113277,949", "3,0000003,1"],
+    }
+    for name, lines in files.items():
+        with open(os.path.join(folder, name), "w", encoding="utf-8") as file:
+            file.write("\n".join(lines) + "\n")
+
+
 class CatalogImdbFieldsTests(unittest.TestCase):
     def test_catalog_has_empty_imdb_fields_when_file_is_missing(self):
-        catalog = load_catalog(imdb_path="/no/such/file.csv")
-        movie = next(iter(catalog.values()))
-        self.assertIsNone(movie["imdb_rating"])
-        self.assertEqual((movie["directors"], movie["cast"]), ([], []))
+        with tempfile.TemporaryDirectory() as folder:
+            make_fake_movielens(folder)
+            catalog = load_catalog(imdb_path="/no/such/file.csv", data_folder=folder)
+        self.assertEqual(len(catalog), 3)
+        for movie in catalog.values():
+            self.assertIsNone(movie["imdb_rating"])
+            self.assertEqual((movie["directors"], movie["cast"]), ([], []))
 
     def test_catalog_reads_imdb_file(self):
         with tempfile.TemporaryDirectory() as folder:
+            make_fake_movielens(folder)
             path = os.path.join(folder, "imdb.csv")
             with open(path, "w", encoding="utf-8", newline="") as file:
                 writer = csv.writer(file)
                 writer.writerow(download_imdb.OUTPUT_COLUMNS)
                 writer.writerow([1, 8.3, 900000, "A|B", "C|D"])
                 writer.writerow([2, "", "", "", ""])
-            catalog = load_catalog(imdb_path=path)
+                writer.writerow([99, 7.0, 5000, "Z", "Z"])  # not in the catalog: ignored
+            catalog = load_catalog(imdb_path=path, data_folder=folder)
         self.assertEqual(catalog[1]["imdb_rating"], 8.3)
         self.assertEqual(catalog[1]["directors"], ["A", "B"])
         self.assertIsNone(catalog[2]["imdb_rating"])
         self.assertEqual(catalog[2]["cast"], [])
+        self.assertIsNone(catalog[3]["imdb_rating"])  # in no line of the IMDb file
 
 
 if __name__ == "__main__":
