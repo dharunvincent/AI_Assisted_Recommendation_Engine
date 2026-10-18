@@ -91,7 +91,10 @@ Each generator lives in its own file inside `src/stage1_candidate_generation/`
    turn, so the picks are spread evenly across the preferred genres. Only
    when no preferred genres are set does it infer favourite genres from
    the titles the user has already watched and liked, and rank titles by
-   how many of those genres they share. Works well once a user has some
+   how many of those genres they share. In that inferred case it only
+   keeps titles with at least 20 ratings, and sorts by the real genre
+   overlap count, then rating count, then average rating (it used to
+   return titles in catalog file order). Works well once a user has some
    history or declared taste, struggles for a brand new user with neither.
 
 2. **Collaborative filtering** (`collaborative.py`) Uses the real
@@ -120,7 +123,10 @@ Each generator lives in its own file inside `src/stage1_candidate_generation/`
 5. **Context aware filtering** (`context_aware.py`) Looks at the
    situation right now, time of day and day of week, and leans the
    suggestions accordingly, for example lighter content on a weekday
-   afternoon, bigger content on a weekend evening.
+   afternoon, bigger content on a weekend evening. Friday evening counts
+   as a weekend evening. It only keeps titles with at least 20 ratings and
+   lists the best known first (it used to take the first matching titles
+   in catalog file order, which let random 1995 films fill the results).
 
 6. **Session based filtering** (`session_based.py`) Looks only at what
    the user just watched in this current sitting, and reacts to that
@@ -135,7 +141,9 @@ Each generator lives in its own file inside `src/stage1_candidate_generation/`
 8. **Diversity injection** (`diversity.py`) Deliberately picks a small
    number of well regarded titles from genres the user rarely touches,
    so the user does not get stuck seeing more of the same thing forever.
-   This exists specifically to fight the filter bubble problem.
+   This exists specifically to fight the filter bubble problem. A title
+   needs at least 20 ratings behind its average to be offered, because a
+   high average from two raters is luck, not quality.
 
 9. **Preferred directors and cast** (`people_based.py`) Only active for a
    persona file that names favourite directors or actors (see "Run it
@@ -250,13 +258,28 @@ user's entire history on every single request, which keeps it fast.
 
 ### The match percentage badge
 
-Every recommended title gets a final score out of 100. On the content
-tile, the platform can choose to show that score as a percentage badge,
-for example a small "91% match" label in the corner. This project uses a
-threshold of 72 percent, agreed on during planning. Titles scoring below
-72 still get recommended and shown normally, they just do not carry the
-badge. The threshold only controls whether the badge is shown, it never
-changes the ranking order itself. For titles without a badge, the tile
+Every recommended title gets two numbers, and they do different jobs.
+
+- **Ranking score** (`final_score`, in the CSV). The weighted sum of taste
+  fit, completion, context fit and promotion. It decides the ORDER of the
+  list and nothing else.
+- **Match %** (`match_percent`, the Match column). How well the title fits
+  the person: 65 percent taste fit (after the dislike penalty) and 35 percent
+  completion likelihood. Promotion and context fit are not part of it, so a
+  promoted title can never look like a better match than it is. The ranking
+  score could not be shown directly because it never goes above about 74:
+  a normal title always scores 0 on promotion, which costs 15 points, and
+  context fit sits near 0.45.
+
+Because the list is ordered by the ranking score, the Match column is not
+always strictly descending.
+
+The badge (a small "91% match" label on the tile) is shown when the match %
+is 85 or higher. 85 was chosen after looking at 228 titles across the four
+built in personas and one saved persona: it badges about 1 in 5 titles
+(18 percent), while the old cut off of 72 would have badged 54 percent of
+them. Titles below 85 still get recommended and shown normally, they just do
+not carry the badge. The threshold never changes the ranking order. For titles without a badge, the tile
 can fall back to a plain tag such as "trending now" if one naturally
 applies, or just show the plain title with nothing extra, never a made
 up reason.
@@ -292,6 +315,8 @@ this version of the project, to keep the scope realistic:
 ```
 AI_Assisted_Recommendation_Engine/
 ├── README.md                     This file
+├── CLAUDE.md                     Project instructions for Claude Code (the coding style mode)
+├── recommend                     The one word launcher script, see "Run it in one word"
 ├── requirements.txt              Only pytest, everything else is standard Python
 ├── .gitignore
 ├── config/
@@ -305,6 +330,8 @@ AI_Assisted_Recommendation_Engine/
 │   └── example.json              A persona file to copy and edit
 ├── src/
 │   ├── catalog.py                 Loads the MovieLens (and optional IMDb) data into memory
+│   ├── launcher.py                 The one word launcher: data check, menu, table (run by `recommend`)
+│   ├── interactive.py              The questions that build a persona file from your answers
 │   ├── results_report.py           Printed list, results CSV and the filter report
 │   ├── run_warnings.py             The grouped "Warnings" section
 │   ├── pipeline.py                 The main entry point, runs everything end to end
@@ -317,7 +344,10 @@ AI_Assisted_Recommendation_Engine/
     ├── test_pipeline.py           Tests for the core logic, filters, merge and decay
     ├── test_rank.py               Tests for the stage 2 penalty, override, business weight and badge
     ├── test_jev_client.py         Tests for how the mock JEV client behaves
-    ├── test_evaluate.py           Tests that the evaluation split never leaks an answer
+    ├── test_evaluate.py           Tests that the evaluation split never leaks an answer, plus the --diagnose helpers
+    ├── test_generators.py         Tests for the content based, diversity and context aware fixes
+    ├── test_interactive.py        Tests for the questions and the --badged-only / --top flags
+    ├── test_launcher.py           Tests for the one word launcher
     ├── test_imdb_data.py          Tests for the IMDb download helpers and catalog fields
     ├── test_persona_loader.py     Tests for the persona file, one group per failure level
     ├── test_hard_filters.py       Tests for the year, IMDb floor and avoided people filters
@@ -346,7 +376,7 @@ Then you see a short summary and type `go` (show recommendations), `redo`
 any time to stop, nothing is saved.
 
 The results are one table with every ranked movie: rank, title, year, IMDb
-rating, match %, a ✓ badge for 72 or above, and the main reason. Your answers
+rating, match %, a ✓ badge for 85 or above, and the main reason. Your answers
 are saved to `personas/<name>.json` and the results to `results/*.csv`,
 neither is committed to git.
 
@@ -438,17 +468,24 @@ random. Arjun's history is built from title keywords like "fast" and
 "drive". These are the top results from one run, and every percentage is
 produced by the mock scorer, not a trained model.
 
-| Persona | Top result | Match | Titles above the 72% badge threshold (top 15) |
+| Persona | Top result | Match | Titles with the badge (match 85 or above, top 15) |
 |---|---|---|---|
-| Arjun | Fight Club (1999) | 72.8% | 2 |
-| Meera | What Happened Was... (1994) | 76.0% | 5 |
-| Thomas | Pulp Fiction (1994) | 72.8% | 1 |
-| Dharun | Usual Suspects, The (1995) | 74.4% | 6 |
+| Arjun | Fight Club (1999) | 93.6% | 3 |
+| Meera | Fight Club (1999) | 93.0% | 10 |
+| Thomas | Inception (2010) | 98.6% | 5 |
+| Dharun | Star Wars: Episode VI - Return of the Jedi (1983) | 88.7% | 11 |
 
-Meera's next picks are Toy Story (75.0%) and Heat (74.5%).
+The percentage is the match %, not the ranking score. Meera's list also
+holds a 100.0% match (What Happened Was..., 1994). **A 100% match is not a
+real perfect fit.** Taste and completion are both answered by the mock
+scorer, whose random wobble can push both to the top, so 100% means the
+wobble was lucky, nothing more. These numbers are higher than the tables
+older versions of this README showed because they are a different measure
+(see "The match percentage badge"). Do not compare them with the old 72.8%
+and 76.0%, those were ranking scores.
 
-What changed compared to the table before the code review, in plain
-English. Meera's top pick used to be Toy Story (82.5%) and Dharun's used to
+The sections below describe an older round of changes, written when the
+table showed ranking scores. In plain English, what changed in that round. Meera's top pick used to be Toy Story (82.5%) and Dharun's used to
 be Pulp Fiction (81.0%). Those two were the promoted titles in the example
 promotion list, and promotion used to hand them up to 13.5 free points over
 every other title, so they won because they were promoted, not because of
@@ -532,28 +569,49 @@ gives the same numbers.
 
 | Measure | Result |
 |---|---|
-| Stage 1 recall, hidden titles that reached the shortlist | 13.2% |
-| Recall of collaborative filtering alone | 10.0% |
-| Recall of trending alone | 7.4% |
-| Recall of content based alone | 1.6% |
-| Recall of business rules alone | 0.4% |
-| Recall of demographic, context aware, session based and diversity | 0.0% each |
+| Stage 1 recall, hidden titles that reached the shortlist | 15.4% (was 13.2%) |
+| Recall of collaborative filtering alone | 10.0% (unchanged) |
+| Recall of trending alone | 7.4% (unchanged) |
+| Recall of context aware alone | 6.4% (was 0.0%) |
+| Recall of content based alone | 3.4% (was 1.6%) |
+| Recall of business rules alone | 0.4% (unchanged) |
+| Recall of demographic, session based and diversity | 0.0% each |
 
 | Top 10 | Hit Rate | Recall |
 |---|---|---|
-| This engine, after stage 2 | 22.0% | 4.6% |
+| This engine, after stage 2 | 17.0% (was 22.0%) | 4.0% (was 4.6%) |
 | Plain "most popular titles" list | 22.0% | 5.8% |
 
 Hit Rate is the share of users with at least one hidden title in their top
 10. Recall is the share of all hidden titles found in the top 10.
 
-Honest reading. On this test the engine does not beat a plain list of the
-most popular titles: the Hit Rate is the same and the Recall is slightly
-lower. Collaborative filtering and trending do almost all the work in stage
-1. The genre based generators find almost nothing here because these test
-users have no declared genres, no age group and no live session, so several
-generators have nothing to work with. That is a fair result for a
-prototype whose scoring layer is a mock.
+Honest reading. The generator fixes helped stage 1: more hidden titles now
+reach the shortlist (15.4 percent, up from 13.2), and the context aware and
+content based generators now find something. But the final top 10 got
+**worse**: Hit Rate fell from 22.0 to 17.0 percent and Recall from 4.6 to
+4.0 percent, so the engine is now clearly behind a plain list of the most
+popular titles. The likely reason is that the newly found titles are better
+known but not better matches, and the mock scorer cannot tell them apart
+from the rest. That is a guess; this evaluation cannot prove it. The
+ranking weights are locked decisions, so they were left alone.
+Collaborative filtering and trending still do most of the work in stage 1.
+The mock scorer decides stage 2, so none of this says how a real JEV model
+would do.
+
+The diagnosis report (`python -m src.evaluate --diagnose`) prints where each
+hidden answer ended up and why. Its summary, before the generator fixes and
+after:
+
+| Diagnosis | Before | After |
+|---|---|---|
+| Hidden answers on the shortlist | 66 | 77 |
+| Their average final rank | 22.2 | 20.8 |
+| Of those, in the top 10 (average rank) | 23 (5.6) | 20 (5.8) |
+| Shortlisted titles with taste fit pushed to 0 by the dislike penalty | 999 of 5000 | 849 of 4193 |
+| Shortlisted titles with taste bias capped at 1.0 | 569 of 5000 | 575 of 4193 |
+| Collaborative answers that made the top 10 | 14 of 46 (30.4%) | 12 of 50 (24.0%) |
+
+Without `--diagnose` the output is exactly the same as before.
 
 Limits of this evaluation:
 - It is small, about 600 users in the dataset and 100 tested, so the numbers
@@ -605,10 +663,15 @@ A code review found the problems below, and each was fixed:
 
 - **The scoring is mocked.** JEV is a mock, so every match percentage
   is simulated, not measured.
-- **Mock noise can outweigh small boosts.** The mock scorer's noise (up
-  to about 7 points) can be bigger than a small boost such as a preferred
-  director, so exact ranks between close titles are not meaningful until a
-  real scorer replaces the mock.
+- **Mock noise can outweigh small boosts.** Taste, completion and context
+  each wobble at the same time. The typical gap between two titles' noise
+  is about 6.6 points, and in the worst case one title's score can be off
+  by about 12.75 points (so two titles could differ by up to about 25).
+  That is bigger than a small boost such as a preferred director, so exact
+  ranks between close titles are not meaningful until a real scorer
+  replaces the mock. **Every number in this README, the match %, the ranking
+  score and the badge, still comes from the mock scorer.** A match of 100%
+  can come from the wobble, not from a real perfect fit.
 - **No IMDb scores.** MovieLens has no IMDb ratings. The Dharun persona
   uses a MovieLens average of 3.0 out of 5 as a stand in for IMDb 6 out
   of 10. Titles with fewer than 20 ratings are removed by this rule,
@@ -638,8 +701,8 @@ A code review found the problems below, and each was fixed:
   disliked. This is a known simplification.
 - **Tie breaks use list order.** When two titles have the same number of
   sources, the merge prefers the one with the better position in a
-  generator's list. Some generators (context aware, session based) do not
-  sort their list by quality, so position is only a rough signal there.
+  generator's list. The session based generator does not
+  sort its list by quality, so position is only a rough signal there.
 - **The evaluation is small and rough.** See the Evaluation section for its
   limits.
 
