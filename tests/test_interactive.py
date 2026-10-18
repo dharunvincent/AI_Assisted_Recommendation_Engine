@@ -134,7 +134,7 @@ class SaveTests(unittest.TestCase):
 def fake_stages(*_args, **_kwargs):
     """Five ranked movies, three with the badge, so the display flags have something to cut."""
     ranked = [
-        {"movie_id": 1, "title": f"Movie {i}", "year": 1995, "final_score": score,
+        {"movie_id": 1, "title": f"Movie {i}", "year": 1995, "final_score": score, "match_percent": score + 5,
          "show_badge": score >= 72, "reasons": ["trending now"]}
         for i, score in enumerate([90, 80, 75, 60, 50], start=1)
     ]

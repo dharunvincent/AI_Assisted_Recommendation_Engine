@@ -29,6 +29,25 @@ assert abs(
 ) < 1e-6, "The four stage 2 weights must add up to 1.0"
 
 # -----------------------------------------------------------------------
+# MATCH PERCENT SHOWN TO THE USER (separate from the ranking score)
+# The final score above decides the ORDER. It also contains promotion and
+# context fit, which say nothing about how well a title suits the person: a
+# normal title always loses the 15 promotion points and context fit sits near
+# 0.45, so the score never gets much above 74 and a promoted title could look
+# like a better match than it is. The match percent shown to the user is built
+# only from how well the title fits the person, taste fit after the dislike
+# penalty and completion likelihood. Taste gets the larger share because it is
+# the direct question "is this for me", completion is the supporting evidence.
+# These two must add up to 1.0.
+# -----------------------------------------------------------------------
+MATCH_TASTE_WEIGHT = 0.65
+MATCH_COMPLETION_WEIGHT = 0.35
+
+assert abs(
+    MATCH_TASTE_WEIGHT + MATCH_COMPLETION_WEIGHT - 1.0
+) < 1e-6, "The two match percent weights must add up to 1.0"
+
+# -----------------------------------------------------------------------
 # BADGE DISPLAY THRESHOLD
 # This does NOT affect ranking order. It only decides whether the
 # percentage match badge is shown on the content tile in the user

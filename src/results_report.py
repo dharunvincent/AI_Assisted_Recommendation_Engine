@@ -20,7 +20,7 @@ from config.weights import SHORT_LIST_WARNING_BELOW
 RESULTS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
 CSV_COLUMNS = [
     "rank", "title", "year", "imdb_rating", "directors", "top_cast",
-    "final_score", "badge", "main_reason", "all_reasons",
+    "match_percent", "final_score", "badge", "main_reason", "all_reasons",
 ]
 BADGE_MARK = "✓"  # shown when the engine's badge flag is set (score 72 or above)
 TOP_CAST_SHOWN = 2  # the printed line stays short, the full cast is in the data
@@ -48,6 +48,7 @@ def build_result_rows(
             "imdb_rating": "" if movie["imdb_rating"] is None else movie["imdb_rating"],
             "directors": ", ".join(movie["directors"]),
             "top_cast": ", ".join(movie["cast"][:TOP_CAST_SHOWN]),
+            "match_percent": item["match_percent"],
             "final_score": item["final_score"],
             "badge": "yes" if item["show_badge"] else "no",
             "main_reason": item["reasons"][0],
@@ -78,7 +79,7 @@ def format_result_table(rows: List[Dict[str, Any]]) -> List[str]:
         [
             str(row["rank"]), row["title"], str(row["year"]),
             str(row["imdb_rating"]) if row["imdb_rating"] != "" else "n/a",
-            f"{row['final_score']:g}%", BADGE_MARK if row["badge"] == "yes" else "",
+            f"{row['match_percent']:g}%", BADGE_MARK if row["badge"] == "yes" else "",
             row["main_reason"],
         ]
         for row in rows
@@ -101,7 +102,7 @@ def format_launcher_table(rows: List[Dict[str, Any]]) -> List[str]:
         [
             str(row["rank"]), row["title"], str(row["year"]),
             str(row["imdb_rating"]) if row["imdb_rating"] != "" else "n/a",
-            f"{row['final_score']:g}%", BADGE_MARK if row["badge"] == "yes" else "",
+            f"{row['match_percent']:g}%", BADGE_MARK if row["badge"] == "yes" else "",
             row["main_reason"],
         ]
         for row in rows

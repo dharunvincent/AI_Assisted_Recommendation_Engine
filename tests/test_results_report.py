@@ -31,7 +31,7 @@ CATALOG = {
 def ranked_item(movie_id, score, badge, reasons):
     return {
         "movie_id": movie_id, "title": f"Movie {movie_id}", "year": 1995,
-        "final_score": score, "show_badge": badge, "reasons": reasons,
+        "final_score": score, "match_percent": score + 5, "show_badge": badge, "reasons": reasons,
     }
 
 
@@ -55,7 +55,8 @@ class RowsAndPrintTests(unittest.TestCase):
         for column in ["Rank", "Title", "Year", "IMDb", "Match", "Badge", "Main reason"]:
             self.assertIn(column, lines[0])
         self.assertIn("8.5", lines[1])
-        self.assertIn("80%", lines[1])
+        self.assertIn("85%", lines[1])  # the Match column shows match_percent, not final_score
+        self.assertNotIn("80%", lines[1])
         self.assertIn("✓", lines[1])
         self.assertIn("n/a", lines[2])
         self.assertNotIn("✓", lines[2])

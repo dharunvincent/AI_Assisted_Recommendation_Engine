@@ -24,6 +24,8 @@ from config.weights import (
     COMPLETION_LIKELIHOOD_WEIGHT,
     CONTEXT_FIT_WEIGHT,
     BUSINESS_WEIGHT_WEIGHT,
+    MATCH_TASTE_WEIGHT,
+    MATCH_COMPLETION_WEIGHT,
     BADGE_DISPLAY_THRESHOLD_PERCENT,
     BUSINESS_WEIGHT_NEUTRAL,
     LIKED_COMPLETION_THRESHOLD,
@@ -43,6 +45,18 @@ def _genre_overlap_count(user, catalog, movie):
     return len(liked_genres.intersection(movie["genres"]))
 
 
+def match_percent_for(taste_fit_after_penalty, completion_likelihood):
+    """
+    Pure. How well the title fits the PERSON, 0 to 100. Only taste fit (after
+    the dislike penalty) and completion count. Promotion and context fit are
+    left out on purpose, see MATCH_TASTE_WEIGHT in config/weights.py.
+    """
+    return round(
+        (taste_fit_after_penalty * MATCH_TASTE_WEIGHT + completion_likelihood * MATCH_COMPLETION_WEIGHT) * 100,
+        1,
+    )
+
+
 def rank_candidates(user, catalog, shortlist, context, dislike_scores):
     """
     dislike_scores: dict of genre mapped to dislike_score, already
@@ -50,7 +64,7 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
     user.
 
     Returns the shortlist, each candidate now carrying a final_score (0
-    to 100), a show_badge flag, and the raw JEV style answers for
+    to 100), a match_percent (0 to 100, shown to the user), a show_badge flag, and the raw JEV style answers for
     transparency, sorted by final_score, highest first.
     """
     ranked = []
@@ -123,6 +137,7 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
             "sources": candidate["sources"],
             "reasons": candidate["reasons"],
             "final_score": final_score,
+            "match_percent": match_percent_for(taste_fit_score, completion_score),
             "show_badge": final_score >= BADGE_DISPLAY_THRESHOLD_PERCENT,
             "dislike_override_used": override_used,
             "jev_answers": jev_answers,

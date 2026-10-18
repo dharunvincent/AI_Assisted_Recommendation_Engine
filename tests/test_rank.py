@@ -13,8 +13,10 @@ Run with:  python3 -m unittest tests.test_rank
 import unittest
 from unittest.mock import patch
 
-from src.stage2_jev_ranking.rank import rank_candidates
+from src.stage2_jev_ranking.rank import rank_candidates, match_percent_for
 from config.weights import (
+    MATCH_TASTE_WEIGHT,
+    MATCH_COMPLETION_WEIGHT,
     TASTE_FIT_WEIGHT,
     COMPLETION_LIKELIHOOD_WEIGHT,
     CONTEXT_FIT_WEIGHT,
@@ -110,6 +112,35 @@ class TestBusinessWeight(unittest.TestCase):
     def test_promoted_title_gets_its_weight_times_the_business_share(self):
         result = rank_one(fixed_answers(), dislike_scores={}, business_weight=0.4)
         self.assertEqual(result["final_score"], expected_final_score(TASTE, business=0.4))
+
+
+class TestMatchPercent(unittest.TestCase):
+    def test_match_percent_is_the_taste_completion_blend(self):
+        result = rank_one(fixed_answers(), dislike_scores={})
+        self.assertEqual(
+            result["match_percent"],
+            round((TASTE * MATCH_TASTE_WEIGHT + COMPLETION * MATCH_COMPLETION_WEIGHT) * 100, 1),
+        )
+
+    def test_promoted_title_gets_the_same_match_percent_as_the_unpromoted_one(self):
+        plain = rank_one(fixed_answers(), dislike_scores={})
+        promoted = rank_one(fixed_answers(), dislike_scores={}, business_weight=0.5)
+        self.assertGreater(promoted["final_score"], plain["final_score"])  # ranking still sees the promotion
+        self.assertEqual(promoted["match_percent"], plain["match_percent"])
+
+    def test_context_fit_does_not_change_match_percent(self):
+        low = rank_one(fixed_answers(context=0.0), dislike_scores={})
+        high = rank_one(fixed_answers(context=1.0), dislike_scores={})
+        self.assertEqual(low["match_percent"], high["match_percent"])
+
+    def test_disliked_genre_title_gets_a_lower_match_percent(self):
+        liked = rank_one(fixed_answers(), dislike_scores={})
+        disliked = rank_one(fixed_answers(), dislike_scores={"Horror": 1.0})
+        self.assertLess(disliked["match_percent"], liked["match_percent"])
+
+    def test_match_percent_stays_between_0_and_100(self):
+        self.assertEqual(match_percent_for(0.0, 0.0), 0.0)
+        self.assertEqual(match_percent_for(1.0, 1.0), 100.0)
 
 
 class TestBadgeAndOrder(unittest.TestCase):
