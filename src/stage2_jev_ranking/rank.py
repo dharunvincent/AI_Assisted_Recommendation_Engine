@@ -10,7 +10,7 @@ movie in the shortlist it does the following:
 4. combines everything into one final score out of 100 using the
    weights locked in during planning (config/weights.py)
 5. works out the match percent shown to the user and decides whether the
-   badge is shown, using the 85 percent threshold on the match percent,
+   badge is shown, using BADGE_DISPLAY_THRESHOLD_PERCENT on the match percent,
    without changing the ranking order itself (that uses the final score)
 
 Remember, every JEV flavoured number here comes from a mock client. The
@@ -19,6 +19,7 @@ architecture, not a measured result from a real trained model.
 """
 
 from src.stage2_jev_ranking import jev_client, scoring_questions
+from src.stage1_candidate_generation.business_rules import business_weight_for_user
 from src.user_profile.people_match import matched_preferred_people
 from config.weights import (
     TASTE_FIT_WEIGHT,
@@ -31,6 +32,7 @@ from config.weights import (
     BUSINESS_WEIGHT_NEUTRAL,
     LIKED_COMPLETION_THRESHOLD,
     DISLIKE_PENALTY_SCALE,
+    DISLIKE_STRENGTH_CAP_FOR_PENALTY,
     OVERRIDE_CONFIDENCE_THRESHOLD,
     OVERRIDE_PENALTY_RETAINED,
 )
@@ -86,7 +88,7 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
             user, movie, candidate, context, dislike_penalty, preferred_people
         )
         questions = scoring_questions.build_questions(
-            movie, candidate, dislike_penalty, genre_overlap_count, len(preferred_people)
+            movie, candidate, context, dislike_penalty, genre_overlap_count, len(preferred_people)
         )
         jev_answers = jev_client.ask(state, questions)
 
@@ -107,18 +109,24 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
         override_used = False
 
         if dislike_penalty > 0:
+            # Cap first, so the override then softens a penalty that already
+            # cannot be bigger than one thumbs down.
+            penalty_strength = min(dislike_penalty, DISLIKE_STRENGTH_CAP_FOR_PENALTY)
             if override_answer == "override_show_anyway" and override_confidence >= OVERRIDE_CONFIDENCE_THRESHOLD:
-                effective_penalty = dislike_penalty * OVERRIDE_PENALTY_RETAINED  # mostly overruled
+                effective_penalty = penalty_strength * OVERRIDE_PENALTY_RETAINED  # mostly overruled
                 override_used = True
             else:
-                effective_penalty = dislike_penalty  # penalty stands
+                effective_penalty = penalty_strength  # penalty stands
             taste_fit_score = max(0.0, taste_fit_score - (effective_penalty * DISLIKE_PENALTY_SCALE))
 
         completion_score = jev_answers["completion_likelihood"]["answer"]
         context_score = jev_answers["context_fit"]["answer"]
         # A title nobody promoted has no business weight and adds nothing.
         # Promotion is a small nudge, worth at most 7.5 extra points.
-        business_score = candidate.get("business_weight", BUSINESS_WEIGHT_NEUTRAL)
+        # Promotion is switched off for a genre the user declared they dislike.
+        business_score = business_weight_for_user(
+            candidate.get("business_weight", BUSINESS_WEIGHT_NEUTRAL), user, movie
+        )
 
         final_score = (
             taste_fit_score * TASTE_FIT_WEIGHT
@@ -152,7 +160,7 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
                 "taste_fit_before_penalty": taste_fit_before_penalty,
                 "taste_fit_after_penalty": taste_fit_score,
                 "taste_bias_before_cap": scoring_questions.taste_bias(
-                    genre_overlap_count, len(preferred_people)
+                    genre_overlap_count, len(preferred_people), candidate.get("collab_strength", 0.0)
                 ),
             },
         })

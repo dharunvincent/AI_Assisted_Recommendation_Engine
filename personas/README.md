@@ -18,6 +18,7 @@ so every field is explained here.
 | `preferred_cast` | no | Actors and actresses you like, same effect. Only the top 5 billed cast of each movie are known. |
 | `avoided_directors`, `avoided_cast` | no | People you never want to see. A hard rule: any title with them is removed. |
 | `favourite_titles` | no | A few movies you already love. They become your watch history, which the "people who liked this also liked" part of the engine needs. Without them, a history is made up from your liked genres. |
+| `never_recommend_titles` | no | Titles you never want to see. A hard rule, and a name blocks every title that contains it as whole words, so `"Star Wars"` blocks every Star Wars film. Capitals and a leading "The" are ignored. The titles it blocked are listed in the Warnings section, and a name that matches nothing gets a "did you mean ...". |
 
 Valid genres: Action, Adventure, Animation, Children, Comedy, Crime,
 Documentary, Drama, Fantasy, Film-Noir, Horror, IMAX, Musical, Mystery,
@@ -30,7 +31,8 @@ Romance, Sci-Fi, Thriller, War, Western.
   `year_to`, or a rating is outside 0 to 10.
 - **The run continues with a warning** when one preference cannot be used:
   an unknown genre is dropped, a director, actor or favourite title that is not
-  found is skipped (with "did you mean ..."), and without the IMDb data the
+  found is skipped (with "did you mean ..."), a `never_recommend_titles` name that
+  matches nothing blocks nothing (with "did you mean ..."), and without the IMDb data the
   IMDb based fields are skipped.
 - **Movies with missing data** (no cast, no rating) are counted quietly and
   shown as one line in the "Warnings" section at the end.

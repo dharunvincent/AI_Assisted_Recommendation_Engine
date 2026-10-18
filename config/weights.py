@@ -56,6 +56,10 @@ assert abs(
 # -----------------------------------------------------------------------
 BADGE_DISPLAY_THRESHOLD_PERCENT = 85
 
+# How many ranked titles the built in persona printout shows, and how many of
+# them the dislike check looks at. Kept here so the two cannot drift apart.
+PRINTED_TOP_COUNT = 15
+
 # -----------------------------------------------------------------------
 # DISLIKE SIGNAL BASE WEIGHTS
 # These feed the taste score decay formula in src/user_profile/taste_score.py
@@ -141,6 +145,15 @@ DISLIKE_SCORE_CAP = 3.0
 # total. This single value keeps the total animation penalty about as strong
 # as before.
 DISLIKE_PENALTY_SCALE = 0.55
+# The dislike SCORE can grow to DISLIKE_SCORE_CAP (3.0) after repeated early
+# exits. Multiplied by the scale that is 1.65, more than all of taste fit, so
+# every title in that genre was pushed to a taste fit of 0 and the whole genre
+# vanished. The penalty therefore only reads the score up to this strength,
+# which is one explicit thumbs down (SIGNAL_WEIGHT_EXPLICIT_THUMBS_DOWN). The
+# biggest possible penalty is then 1.0 x 0.55 = 0.55 of taste fit, never all of
+# it. The stored score and its decay are not touched, only how much of it the
+# penalty is allowed to use.
+DISLIKE_STRENGTH_CAP_FOR_PENALTY = 1.0
 # If the override question answers "show anyway" with at least this much
 # confidence, the penalty is mostly lifted for that one title.
 OVERRIDE_CONFIDENCE_THRESHOLD = 0.65
@@ -156,16 +169,37 @@ OVERRIDE_PENALTY_RETAINED = 0.25
 # with things the user liked.
 TASTE_BIAS_BASE = 0.5
 TASTE_BIAS_PER_GENRE_OVERLAP = 0.12
-# Expected context fit: higher when the title already came from the
-# context aware generator in stage 1.
-CONTEXT_BIAS_FROM_CONTEXT_GENERATOR = 0.75
+# Expected context fit: higher when the title's own genres fit the current
+# context bucket (see CONTEXT_GENRE_RULES in context_aware.py). It used to
+# depend on which generator happened to find the title, which handed about
+# 4.5 free points to 15 popular titles for every user. Now the title decides.
+CONTEXT_BIAS_MATCHES_BUCKET = 0.75
 CONTEXT_BIAS_DEFAULT = 0.45
+# Collaborative filtering says HOW STRONGLY other viewers link a title to the
+# user's liked ones (collab_strength, 0 to 1, the best match of that user's list
+# being 1). Stage 2 used to ignore it, so a title picked by a strong crowd match
+# ranked like any other. The boost is strength x COLLAB_TASTE_BIAS_MAX, and the
+# maximum equals one shared genre (TASTE_BIAS_PER_GENRE_OVERLAP, 0.12): crowd
+# evidence is a hint at the same weight as one liked genre, never a verdict.
+# COLLAB_STRENGTH_CAP stops a bad strength value from breaking that limit.
+COLLAB_TASTE_BIAS_MAX = 0.12
+COLLAB_STRENGTH_CAP = 1.0
 # Expected answer to the override question: strong when the title shares at
 # least OVERRIDE_MIN_GENRE_OVERLAP liked genres and a penalty is active,
 # weak otherwise.
 OVERRIDE_BIAS_STRONG_FIT = 0.7
 OVERRIDE_BIAS_WEAK_FIT = 0.1
 OVERRIDE_MIN_GENRE_OVERLAP = 2
+# Sharing liked genres is not enough to beat a dislike: nearly every popular
+# title shares two, which let an ordinary crowd pleaser like Toy Story (3.92)
+# overrule the animation dislike. The strong override chance also needs a
+# standout average rating. 4.2 of 5 was chosen from the catalog: among the
+# 1297 titles with at least MIN_RATINGS_FOR_QUALITY_FLOOR ratings, 39 (3 percent)
+# reach 4.2, the real classics. Counting titles with any number of ratings,
+# 972 reach it, but nearly all of those are averages of a handful of raters, so
+# the title must also have the minimum rating count. A guess to be tuned on real
+# data, like the other numbers here.
+OVERRIDE_STANDOUT_RATING = 4.2
 
 # -----------------------------------------------------------------------
 # STAGE 1 GENERATOR CUT OFFS

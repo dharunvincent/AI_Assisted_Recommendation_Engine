@@ -37,6 +37,8 @@ def merge(generator_results):
                     "sources": [candidate["source"]],
                     "reasons": [candidate["reason"]],
                     "business_weight": candidate.get("business_weight", BUSINESS_WEIGHT_NEUTRAL),
+                    # Only collaborative candidates carry a strength, 0 for the rest.
+                    "collab_strength": candidate.get("collab_strength", 0.0),
                 }
             else:
                 merged[movie_id]["sources"].append(candidate["source"])
@@ -46,6 +48,10 @@ def merge(generator_results):
                 candidate_weight = candidate.get("business_weight", BUSINESS_WEIGHT_NEUTRAL)
                 if candidate_weight > merged[movie_id]["business_weight"]:
                     merged[movie_id]["business_weight"] = candidate_weight
+                # Keep the strongest collaborative strength seen for the title.
+                merged[movie_id]["collab_strength"] = max(
+                    merged[movie_id]["collab_strength"], candidate.get("collab_strength", 0.0)
+                )
 
     # A movie suggested by more than one generator independently is
     # usually a stronger candidate, so those come first. Ties are then

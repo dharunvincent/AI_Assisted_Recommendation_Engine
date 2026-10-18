@@ -27,7 +27,7 @@ CONTEXT_GENRE_RULES = {
 }
 
 
-def _context_bucket(context):
+def context_bucket(context):
     day = context.get("day_of_week")
     is_evening = context.get("time_of_day") == "evening"
     # Friday evening already feels like the weekend, so it uses the weekend
@@ -38,10 +38,18 @@ def _context_bucket(context):
     return f"{weekend_part}_{time_part}"
 
 
+def genres_for_context(context):
+    """
+    Pure. The genres that fit the current context bucket. The one place that
+    answers this, shared by this generator and by stage 2 context fit.
+    """
+    return CONTEXT_GENRE_RULES.get(context_bucket(context), [])
+
+
 def generate(user, catalog, context, max_candidates=15):
     watched_ids = {entry["movie_id"] for entry in user["watch_history"]}
-    bucket = _context_bucket(context)
-    preferred_genres = CONTEXT_GENRE_RULES.get(bucket, [])
+    bucket = context_bucket(context)
+    preferred_genres = genres_for_context(context)
 
     if not preferred_genres:
         return []

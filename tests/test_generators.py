@@ -15,6 +15,7 @@ from config.weights import (
     DIVERSITY_MIN_AVG_RATING, DIVERSITY_MIN_RATINGS,
 )
 from src.stage1_candidate_generation import content_based, context_aware, diversity
+from src.stage1_candidate_generation.business_rules import business_weight_for_user
 
 ENOUGH = MIN_RATINGS_FOR_CONTENT_BASED
 
@@ -118,6 +119,23 @@ class TestContextAware(unittest.TestCase):
         self.assertEqual(self.ids({"day_of_week": "Thursday", "time_of_day": "evening"}, action, drama), [3])
         comedy = movie(4, ["Comedy"])
         self.assertEqual(self.ids({"day_of_week": "Friday", "time_of_day": "daytime"}, action, comedy), [4])
+
+
+class TestBusinessWeightForUser(unittest.TestCase):
+    TOY = {"genres": ["Animation", "Comedy"]}
+
+    def test_declared_dislike_zeroes_the_weight(self):
+        self.assertEqual(business_weight_for_user(0.4, {"disliked_genres": ["Animation"]}, self.TOY), 0.0)
+
+    def test_other_dislike_keeps_the_weight(self):
+        self.assertEqual(business_weight_for_user(0.4, {"disliked_genres": ["Horror"]}, self.TOY), 0.4)
+
+    def test_user_without_the_field_keeps_the_weight(self):
+        self.assertEqual(business_weight_for_user(0.4, {}, self.TOY), 0.4)
+
+    def test_weight_is_never_raised(self):
+        for user in ({}, {"disliked_genres": ["Animation"]}):
+            self.assertLessEqual(business_weight_for_user(0.4, user, self.TOY), 0.4)
 
 
 if __name__ == "__main__":

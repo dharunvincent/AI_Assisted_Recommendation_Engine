@@ -28,8 +28,8 @@ BUILT_IN = [
     {"name": "Arjun", "taste_summary": "loves racing movies", "user_id": "p1"},
     {"name": "Meera", "taste_summary": "loves comedy", "user_id": "p2"},
 ]
-# name, liked, disliked, rating, year from, year to, 4 people questions, favourites
-ANSWERS = ["Dharun", "action", "", "", "", "", "", "", "", "", ""]
+# name, liked, disliked, rating, year from, year to, 4 people questions, favourites, never recommend
+ANSWERS = ["Dharun", "action", "", "", "", "", "", "", "", "", "", ""]
 
 
 class LauncherCase(unittest.TestCase):
@@ -107,7 +107,7 @@ class QuestionTests(LauncherCase):
         self.assertTrue(os.path.exists(os.path.join(self.personas, "me.json")))
 
     def test_bad_answer_is_explained_and_asked_again(self):
-        answers = ["2", "Sam", "action", "", "", "nineteen", "1995", ""] + [""] * 6 + ["go"]
+        answers = ["2", "Sam", "action", "", "", "nineteen", "1995", ""] + [""] * 7 + ["go"]
         _, text, _ = self.launch(answers)
         self.assertIn("'nineteen' is not a whole year", text)
         self.assertIn("=== Recommendations for Sam ===", text)
@@ -117,7 +117,7 @@ class QuestionTests(LauncherCase):
         self.assertIn("Please type go, redo or quit.", text)
 
     def test_redo_starts_the_questions_over(self):
-        second = ["Ann", "crime"] + [""] * 9
+        second = ["Ann", "crime"] + [""] * 10
         _, text, console = self.launch(["2"] + ANSWERS + ["redo"] + second + ["go"])
         self.assertEqual(console.prompts.count("What is your name? (Enter to skip) "), 2)
         self.assertIn("=== Recommendations for Ann ===", text)

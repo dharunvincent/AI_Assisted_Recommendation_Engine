@@ -10,7 +10,10 @@ or simply: python -m unittest tests.test_pipeline
 (run from the project root folder)
 """
 
+import io
 import unittest
+from contextlib import redirect_stdout
+from unittest.mock import patch
 from datetime import datetime, timedelta
 
 from src.user_profile.taste_score import decay_factor, update_dislike_score
@@ -18,7 +21,7 @@ from src.stage1_candidate_generation.merge_shortlist import merge
 from src.stage1_candidate_generation.collaborative import build_similarity_table
 from src.exclusion_filter.exclude import exclude
 from src.stage1_candidate_generation.content_based import generate as generate_content_based
-from src.pipeline import build_dislike_scores
+from src.pipeline import build_dislike_scores, print_results
 from src.stage1_candidate_generation.business_rules import validate_promoted_content
 from config.weights import STAGE1_SHORTLIST_MAX_SIZE, BUSINESS_WEIGHT_MAX_PROMOTION, BUSINESS_WEIGHT_NEUTRAL, MIN_RATINGS_FOR_QUALITY_FLOOR, SIGNAL_HALF_LIFE_DAYS
 
@@ -223,6 +226,26 @@ class TestExplicitGenreDislike(unittest.TestCase):
 
     def test_no_disliked_genres_means_no_scores(self):
         self.assertEqual(build_dislike_scores({"watch_history": []}, catalog={}), {})
+
+
+class TestBadgeThresholdInPrintout(unittest.TestCase):
+    """The printed sentences read the badge threshold from config, they do not copy it."""
+
+    def printed(self, threshold):
+        item = {
+            "title": "T", "year": 2000, "match_percent": 60.0, "show_badge": False,
+            "dislike_override_used": False, "reasons": ["r"], "avg_rating": 4.0, "genres": ["Drama"],
+            "jev_answers": {k: {"answer": 0.5} for k in ("taste_fit", "completion_likelihood", "context_fit")},
+        }
+        user = {"name": "N", "user_id": "u", "taste_summary": "s"}
+        output = io.StringIO()
+        with patch("src.pipeline.BADGE_DISPLAY_THRESHOLD_PERCENT", threshold), redirect_stdout(output):
+            print_results(user, [item])
+        return output.getvalue()
+
+    def test_below_threshold_sentence_follows_the_config_value(self):
+        self.assertIn("below 70%", self.printed(70))
+        self.assertIn("below 90%", self.printed(90))
 
 
 if __name__ == "__main__":

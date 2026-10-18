@@ -43,9 +43,9 @@ def run(answers):
     return interview(console.ask, console.say, make_catalog()), console
 
 
-# name, liked, disliked, rating, year from, year to, 4 people questions, favourites, confirm
+# name, liked, disliked, rating, year from, year to, 4 people questions, favourites, never recommend, confirm
 HAPPY = ["Dharun", "action, crime", "Animation", "7", "1990", "2018",
-         "Michael Mann", "Al Pacino", "", "", "Heat", "y"]
+         "Michael Mann", "Al Pacino", "", "", "Heat", "", "y"]
 
 
 class InterviewTests(unittest.TestCase):
@@ -61,47 +61,47 @@ class InterviewTests(unittest.TestCase):
         self.assertIn("Run with these? (y/n) ", console.prompts)
 
     def test_enter_skips_every_optional_question(self):
-        data, _ = run(["Sam", "Action", "", "", "", "", "", "", "", "", "", "y"])
+        data, _ = run(["Sam", "Action", "", "", "", "", "", "", "", "", "", "", "y"])
         self.assertEqual(data["disliked_genres"], [])
         self.assertIsNone(data["min_imdb_rating"])
         self.assertIsNone(data["year_from"])
         self.assertEqual(data["favourite_titles"], [])
 
     def test_bad_year_is_explained_and_asked_again(self):
-        answers = ["Sam", "Action", "", "", "nineteen", "1995", "", "", "", "", "", "", "y"]
+        answers = ["Sam", "Action", "", "", "nineteen", "1995", "", "", "", "", "", "", "", "y"]
         data, console = run(answers)
         self.assertEqual(data["year_from"], 1995)
         self.assertEqual(console.prompts.count("Only movies from this year on (Enter to skip): "), 2)
         self.assertTrue(any("'nineteen' is not a whole year" in line for line in console.said))
 
     def test_year_to_before_year_from_is_asked_again(self):
-        answers = ["Sam", "Action", "", "", "2000", "1990", "2005", "", "", "", "", "", "y"]
+        answers = ["Sam", "Action", "", "", "2000", "1990", "2005", "", "", "", "", "", "", "y"]
         data, _ = run(answers)
         self.assertEqual(data["year_to"], 2005)
 
     def test_rating_outside_zero_to_ten_is_asked_again(self):
-        data, console = run(["Sam", "Action", "", "11", "8", "", "", "", "", "", "", "", "y"])
+        data, console = run(["Sam", "Action", "", "11", "8", "", "", "", "", "", "", "", "", "y"])
         self.assertEqual(data["min_imdb_rating"], 8.0)
         self.assertTrue(any("between 0 and 10" in line for line in console.said))
 
     def test_unknown_genre_is_explained_and_asked_again(self):
-        data, console = run(["Sam", "Actoin", "Action", "", "", "", "", "", "", "", "", "", "y"])
+        data, console = run(["Sam", "Actoin", "Action", "", "", "", "", "", "", "", "", "", "", "y"])
         self.assertEqual(data["liked_genres"], ["Action"])
         self.assertTrue(any("Unknown genre 'Actoin'" in line for line in console.said))
 
     def test_did_you_mean_accepted_with_y(self):
-        answers = ["Sam", "Action", "", "", "", "", "Micheal Mann", "y", "", "", "", "", "y"]
+        answers = ["Sam", "Action", "", "", "", "", "Micheal Mann", "y", "", "", "", "", "", "y"]
         data, console = run(answers)
         self.assertEqual(data["preferred_directors"], ["Michael Mann"])
         self.assertTrue(any("Did you mean Michael Mann?" in p for p in console.prompts))
 
     def test_did_you_mean_skipped_with_n(self):
-        answers = ["Sam", "Action", "", "", "", "", "Micheal Mann", "n", "", "", "", "", "y"]
+        answers = ["Sam", "Action", "", "", "", "", "Micheal Mann", "n", "", "", "", "", "", "y"]
         data, _ = run(answers)
         self.assertEqual(data["preferred_directors"], [])
 
     def test_favourite_title_did_you_mean_accepted(self):
-        answers = ["Sam", "Action", "", "", "", "", "", "", "", "", "Inceptoin", "y", "y"]
+        answers = ["Sam", "Action", "", "", "", "", "", "", "", "", "Inceptoin", "y", "", "y"]
         data, _ = run(answers)
         self.assertEqual(data["favourite_titles"], ["Inception (1995)"])
 

@@ -137,7 +137,7 @@ class TakingTurnsTests(unittest.TestCase):
 class TasteBoostTests(unittest.TestCase):
     def taste_bias(self, people_count):
         questions = scoring_questions.build_questions(
-            CATALOG[1], {"sources": []}, 0.0, 0, people_count
+            CATALOG[1], {"sources": []}, {}, 0.0, 0, people_count
         )
         return questions["taste_fit"].bias_hint
 

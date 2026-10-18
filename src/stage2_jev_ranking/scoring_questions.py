@@ -21,17 +21,22 @@ the business_rules generator in stage 1 and is combined separately in
 rank.py.
 """
 
+from src.stage1_candidate_generation.context_aware import genres_for_context
 from src.stage2_jev_ranking.jev_client import Score, Choice
 from config.weights import (
     TASTE_BIAS_BASE,
     TASTE_BIAS_PER_GENRE_OVERLAP,
     TASTE_BIAS_PER_PREFERRED_PERSON,
     TASTE_BIAS_PEOPLE_CAP,
-    CONTEXT_BIAS_FROM_CONTEXT_GENERATOR,
+    CONTEXT_BIAS_MATCHES_BUCKET,
     CONTEXT_BIAS_DEFAULT,
+    COLLAB_TASTE_BIAS_MAX,
+    COLLAB_STRENGTH_CAP,
     OVERRIDE_BIAS_STRONG_FIT,
     OVERRIDE_BIAS_WEAK_FIT,
     OVERRIDE_MIN_GENRE_OVERLAP,
+    OVERRIDE_STANDOUT_RATING,
+    MIN_RATINGS_FOR_QUALITY_FLOOR,
 )
 
 
@@ -70,7 +75,15 @@ def people_taste_boost(preferred_people_count):
     return min(preferred_people_count * TASTE_BIAS_PER_PREFERRED_PERSON, TASTE_BIAS_PEOPLE_CAP)
 
 
-def taste_bias(genre_overlap_count, preferred_people_count=0):
+def collab_taste_boost(collab_strength):
+    """
+    Pure. The extra expected taste fit for a strong collaborative match:
+    strength (0 to 1) times COLLAB_TASTE_BIAS_MAX, never more than that.
+    """
+    return min(max(collab_strength, 0.0), COLLAB_STRENGTH_CAP) * COLLAB_TASTE_BIAS_MAX
+
+
+def taste_bias(genre_overlap_count, preferred_people_count=0, collab_strength=0.0):
     """
     The expected taste fit BEFORE the mock clamps it to 0..1. A value above
     1.0 means the mock cannot tell the title apart from a perfect fit, so
@@ -80,11 +93,37 @@ def taste_bias(genre_overlap_count, preferred_people_count=0):
         TASTE_BIAS_BASE
         + (genre_overlap_count * TASTE_BIAS_PER_GENRE_OVERLAP)
         + people_taste_boost(preferred_people_count)
+        + collab_taste_boost(collab_strength)
     )
 
 
+def is_strong_override_fit(movie, genre_overlap_count):
+    """
+    Pure. True only for a title that shares enough liked genres AND is a
+    standout by rating, so overriding a genre dislike stays occasional.
+    A title with no rating, or too few ratings to trust the average, never
+    counts as a standout.
+    """
+    rating = movie["avg_rating"]
+    return (
+        genre_overlap_count >= OVERRIDE_MIN_GENRE_OVERLAP
+        and rating is not None
+        and rating >= OVERRIDE_STANDOUT_RATING
+        and movie.get("rating_count", 0) >= MIN_RATINGS_FOR_QUALITY_FLOOR
+    )
+
+
+def context_taste_bias(movie, context):
+    """
+    Pure. Expected context fit, based on the title alone: higher when one of
+    its genres is in the current context bucket, whichever generator found it.
+    """
+    fits_now = set(genres_for_context(context)).intersection(movie["genres"])
+    return CONTEXT_BIAS_MATCHES_BUCKET if fits_now else CONTEXT_BIAS_DEFAULT
+
+
 def build_questions(
-    movie, candidate, dislike_penalty, genre_overlap_count, preferred_people_count=0
+    movie, candidate, context, dislike_penalty, genre_overlap_count, preferred_people_count=0
 ):
     """
     Returns the dict of questions to send to jev_client.ask(), each
@@ -96,7 +135,9 @@ def build_questions(
     # deliberately NOT part of this number. It is applied exactly once,
     # in rank.py, so that the override logic can soften it cleanly. If it
     # was also subtracted here, the override could never fully work.
-    expected_taste = taste_bias(genre_overlap_count, preferred_people_count)
+    expected_taste = taste_bias(
+        genre_overlap_count, preferred_people_count, candidate.get("collab_strength", 0.0)
+    )
 
     # Rough expectation for completion likelihood, a well regarded movie
     # in the real MovieLens data is a reasonable proxy for "most people
@@ -104,12 +145,7 @@ def build_questions(
     rating = movie["avg_rating"] if movie["avg_rating"] is not None else 3.0
     completion_bias = rating / 5.0
 
-    # Rough expectation for context fit, if this candidate already came
-    # from the context_aware generator in stage 1, it already fits the
-    # current moment reasonably well.
-    context_bias = (
-        CONTEXT_BIAS_FROM_CONTEXT_GENERATOR if "context_aware" in candidate["sources"] else CONTEXT_BIAS_DEFAULT
-    )
+    context_bias = context_taste_bias(movie, context)
 
     return {
         "taste_fit": Score(
@@ -131,7 +167,7 @@ def build_questions(
             options=["override_show_anyway", "keep_penalty"],
             bias_hint=(
                 OVERRIDE_BIAS_STRONG_FIT
-                if genre_overlap_count >= OVERRIDE_MIN_GENRE_OVERLAP and dislike_penalty > 0
+                if dislike_penalty > 0 and is_strong_override_fit(movie, genre_overlap_count)
                 else OVERRIDE_BIAS_WEAK_FIT
             ),
         ),

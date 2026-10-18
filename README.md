@@ -229,7 +229,9 @@ penalty that JEV can occasionally overrule, rather than a complete block.
 The penalty is applied in exactly one place, `rank.py`. It is never also
 folded into the taste fit question, which would count it twice and stop
 the override from working. In the mock, the override question is answered
-"show anyway" rarely for weak fits and often for strong fits.
+"show anyway" rarely for weak fits and often for strong fits. What counts as
+a strong fit is explained in "Round three changes" below: it now takes a
+standout rating, not just shared genres.
 
 ### How the dislike score itself is built, the decay formula
 
@@ -275,10 +277,13 @@ Because the list is ordered by the ranking score, the Match column is not
 always strictly descending.
 
 The badge (a small "91% match" label on the tile) is shown when the match %
-is 85 or higher. 85 was chosen after looking at 228 titles across the four
+is 85 or higher (`BADGE_DISPLAY_THRESHOLD_PERCENT`). 85 was chosen after looking at 228 titles across the four
 built in personas and one saved persona: it badges about 1 in 5 titles
 (18 percent), while the old cut off of 72 would have badged 54 percent of
-them. Titles below 85 still get recommended and shown normally, they just do
+them. That 1 in 5 was measured before round three. After it, 34 of the 60
+titles in the four built in top 15 lists carry the badge (57 percent), because the
+dislike penalty is capped and context fit now lifts every title that suits the
+moment. The cut off was not changed, it is a locked decision. Titles below 85 still get recommended and shown normally, they just do
 not carry the badge. The threshold never changes the ranking order. For titles without a badge, the tile
 can fall back to a plain tag such as "trending now" if one naturally
 applies, or just show the plain title with nothing extra, never a made
@@ -447,7 +452,8 @@ For someone who does not code. Think of the engine as a funnel.
    different angle (similar genres, what similar people watched, what is
    popular, your favourite directors, and so on).
 4. **Remove what must never appear.** Already seen, wrong years, rated too
-   low, or with someone you never want to see. These are rules, so they
+   low, with someone you never want to see, or a title you named in
+   `never_recommend_titles`. These are rules, so they
    always win.
 5. **Rank what is left.** A scorer (a mock stand in, not a real AI model yet)
    gives each title a score out of 100. Disliked genres only lower a score a
@@ -470,13 +476,13 @@ produced by the mock scorer, not a trained model.
 
 | Persona | Top result | Match | Titles with the badge (match 85 or above, top 15) |
 |---|---|---|---|
-| Arjun | Fight Club (1999) | 93.6% | 3 |
-| Meera | Fight Club (1999) | 93.0% | 10 |
-| Thomas | Inception (2010) | 98.6% | 5 |
-| Dharun | Star Wars: Episode VI - Return of the Jedi (1983) | 88.7% | 11 |
+| Arjun | The Raid: Redemption (2011) | 96.7% | 4 |
+| Meera | What Happened Was... (1994) | 100.0% | 10 |
+| Thomas | Inception (2010) | 98.6% | 6 |
+| Dharun | Star Wars: Episode V - The Empire Strikes Back (1980) | 94.7% | 14 |
 
-The percentage is the match %, not the ranking score. Meera's list also
-holds a 100.0% match (What Happened Was..., 1994). **A 100% match is not a
+The percentage is the match %, not the ranking score. Meera's top pick is a
+100.0% match (What Happened Was..., 1994), a title with a single rating. **A 100% match is not a
 real perfect fit.** Taste and completion are both answered by the mock
 scorer, whose random wobble can push both to the top, so 100% means the
 wobble was lucky, nothing more. These numbers are higher than the tables
@@ -579,13 +585,22 @@ gives the same numbers.
 
 | Top 10 | Hit Rate | Recall |
 |---|---|---|
-| This engine, after stage 2 | 17.0% (was 22.0%) | 4.0% (was 4.6%) |
+| This engine, after stage 2 | 19.0% (round three; 17.0% before it, 22.0% originally) | 4.4% (4.0% before it, 4.6% originally) |
 | Plain "most popular titles" list | 22.0% | 5.8% |
 
 Hit Rate is the share of users with at least one hidden title in their top
 10. Recall is the share of all hidden titles found in the top 10.
 
-Honest reading. The generator fixes helped stage 1: more hidden titles now
+Honest reading, round three. Hit Rate rose from 17.0 to 19.0 percent and
+Recall from 4.0 to 4.4 percent. That is 2 more users out of 100 and 3 more
+hidden titles out of 500, which is within what the noise of a 100 user test
+can do on its own, so treat it as "no worse, probably a little better", not
+as proof. The engine is still behind the plain popular list (22.0 percent).
+Stage 1 recall did not move (15.4 percent) because round three only changed
+stage 2 scoring. The newly found titles are still better known but not clearly
+better matches, and the mock scorer cannot tell them apart.
+
+Honest reading, from the generator fixes round (before round three). The generator fixes helped stage 1: more hidden titles now
 reach the shortlist (15.4 percent, up from 13.2), and the context aware and
 content based generators now find something. But the final top 10 got
 **worse**: Hit Rate fell from 22.0 to 17.0 percent and Recall from 4.6 to
@@ -611,6 +626,22 @@ after:
 | Shortlisted titles with taste bias capped at 1.0 | 569 of 5000 | 575 of 4193 |
 | Collaborative answers that made the top 10 | 14 of 46 (30.4%) | 12 of 50 (24.0%) |
 
+The same summary after round three (the "before" below is the row above):
+
+| Diagnosis | Before round three | After round three |
+|---|---|---|
+| Hidden answers on the shortlist | 77 | 77 |
+| Their average final rank | 20.8 | 18.8 |
+| Of those, in the top 10 (average rank) | 20 (5.8) | 22 (5.6) |
+| Shortlisted titles with taste fit pushed to 0 by the dislike penalty | 849 of 4193 | 26 of 4193 |
+| Shortlisted titles with taste bias capped at 1.0 | 575 of 4193 | 806 of 4193 |
+| Collaborative answers that made the top 10 | 12 of 50 (24.0%) | 16 of 50 (32.0%) |
+
+The titles with taste bias capped at 1.0 went UP. That is the collaborative
+boost doing what it was built to do, but it also means more titles now sit at
+the ceiling where the mock cannot tell them apart. The 26 titles still at 0
+are ones whose taste fit was already below the largest penalty, 0.55.
+
 Without `--diagnose` the output is exactly the same as before.
 
 Limits of this evaluation:
@@ -623,6 +654,58 @@ Limits of this evaluation:
   small leak affects trending, the quality floor and the mock scorer, and it
   also helps the popularity baseline.
 - Every user gets the same example context (Friday evening).
+
+## Round three changes
+
+These changes keep the locked decisions (watch bands, the 0.55 penalty
+scale, hard filters, the 7.5 point promotion limit, the preferred person boost,
+the mock scorer, the ranking weights 45/25/15/15, the match percent and the
+85 badge). In plain English:
+
+1. **A dislike can no longer erase a whole genre.** The dislike score can grow
+   to 3.0 after repeated early exits, and 3.0 x 0.55 is more than all of a
+   title's taste fit, so every title in that genre dropped to 0. The penalty now
+   reads the score only up to 1.0 (one explicit thumbs down), so the biggest
+   penalty is 0.55 of taste fit. The stored score and its decay are untouched.
+   Titles pushed to 0 fell from 849 to 26 (`DISLIKE_STRENGTH_CAP_FOR_PENALTY`).
+2. **The override is now occasional.** Before, any title sharing two liked
+   genres had a strong chance to beat a dislike, which is how Toy Story beat the
+   animation dislike. A title now also needs a standout average rating of 4.2
+   (`OVERRIDE_STANDOUT_RATING`) from at least 20 raters. In the catalog 972
+   titles reach 4.2 on rating alone, but most are averages of a handful of
+   raters; 39 pass with the 20 rater minimum. Toy Story (3.92) does not. For
+   Dharun it fell from rank 2 to rank 31 of 35.
+3. **Promotion never pushes a declared dislike.** A promoted title with a genre
+   in the user's `disliked_genres` gets business weight 0 for that user.
+   Dislikes learned from watch history do not count, only declared ones.
+4. **Context fit is about the title.** It used to give 0.75 only when the
+   context aware generator happened to pick the title, a free 4.5 points for 15
+   popular titles for everyone. Now it is 0.75 when the title's genres match the
+   current context bucket and 0.45 otherwise, whichever generator found it. The
+   bucket logic lives in `context_aware.py` and is reused, not copied.
+5. **Stage 2 uses the collaborative match strength.** Each collaborative pick
+   now carries how strong the match was (0 to 1, the best pick of a user's list
+   being 1). It adds up to 0.12 to the expected taste fit, the same as one
+   shared genre. Collaborative answers in the top 10 went from 12 of 50 to 16 of 50.
+6. **You can block titles.** `never_recommend_titles` in a persona file, and one
+   optional interview question. A name blocks every title that contains it as
+   whole words ("Star Wars" blocks all 13 Star Wars titles in the data, "Her"
+   does not block "Mother"). The blocked titles are listed in Warnings, and a
+   name that matches nothing gets a "did you mean".
+7. **No more copies of config values.** The two printed sentences that said "85"
+   and the repeated "top 15" now read `BADGE_DISPLAY_THRESHOLD_PERCENT` and
+   `PRINTED_TOP_COUNT`.
+
+Before and after for every number and each persona's top 15 are saved in
+`evaluation_snapshots/` (`comparison.md`). **Every number in this README still
+comes from the mock scorer.** The evaluation measures the mock's rules, not a
+trained JEV model.
+
+An honest finding from the comparison: Meera's top pick is a title with one
+rating (average 5.0), and three other single rating titles sit in her top 15.
+This is not new, the same title was already 3rd before round three. The mock
+trusts a perfect average from one rater, because completion is guessed from the
+average rating. Round three did not touch this and it is the next thing worth fixing.
 
 ## Changes after code review
 

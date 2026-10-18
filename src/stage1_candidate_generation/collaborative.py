@@ -124,13 +124,19 @@ def generate(user, catalog, max_candidates=15, similarity_table=None):
             if related_id not in watched_ids:
                 score_board[related_id] += similarity
 
+    picks = [
+        (movie_id, score) for movie_id, score in score_board.most_common(max_candidates)
+        if movie_id in catalog
+    ]
+    # Strength is each pick's score relative to the best pick, so it is 0 to 1
+    # for every user whatever the size of their history. Stage 2 reads it.
+    best_score = picks[0][1] if picks else 1.0
     candidates = []
-    for movie_id, similarity in score_board.most_common(max_candidates):
-        if movie_id not in catalog:
-            continue
+    for movie_id, score in picks:
         candidates.append({
             "movie_id": movie_id,
             "source": "collaborative",
             "reason": "other viewers with similar taste also watched this",
+            "collab_strength": score / best_score,
         })
     return candidates

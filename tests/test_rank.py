@@ -26,6 +26,8 @@ from config.weights import (
     DISLIKE_PENALTY_SCALE,
     OVERRIDE_PENALTY_RETAINED,
     OVERRIDE_CONFIDENCE_THRESHOLD,
+    DISLIKE_STRENGTH_CAP_FOR_PENALTY,
+    DISLIKE_SCORE_CAP,
 )
 
 TASTE, COMPLETION, CONTEXT = 0.8, 0.6, 0.5  # the fixed answers used in most tests
@@ -103,6 +105,30 @@ class TestDislikePenalty(unittest.TestCase):
         self.assertEqual(result["final_score"], expected_final_score(TASTE - penalty * DISLIKE_PENALTY_SCALE))
         self.assertFalse(result["dislike_override_used"])
 
+    def test_dislike_score_above_the_cap_costs_the_same_as_the_cap(self):
+        # Rule: the penalty never exceeds CAP x SCALE of taste fit, however high the stored score is.
+        at_cap = rank_one(fixed_answers(), dislike_scores={"Horror": DISLIKE_STRENGTH_CAP_FOR_PENALTY})
+        way_above = rank_one(fixed_answers(), dislike_scores={"Horror": DISLIKE_SCORE_CAP})
+        self.assertEqual(at_cap["final_score"], way_above["final_score"])
+        self.assertEqual(
+            way_above["final_score"],
+            expected_final_score(TASTE - DISLIKE_STRENGTH_CAP_FOR_PENALTY * DISLIKE_PENALTY_SCALE),
+        )
+
+    def test_biggest_score_no_longer_wipes_out_taste_fit(self):
+        result = rank_one(fixed_answers(taste=0.7), dislike_scores={"Horror": DISLIKE_SCORE_CAP})
+        self.assertGreater(result["diagnostics"]["taste_fit_after_penalty"], 0.0)
+
+    def test_score_below_the_cap_is_not_changed(self):
+        result = rank_one(fixed_answers(), dislike_scores={"Horror": 0.5})
+        self.assertEqual(result["final_score"], expected_final_score(TASTE - 0.5 * DISLIKE_PENALTY_SCALE))
+
+    def test_override_also_works_from_the_capped_strength(self):
+        answers = fixed_answers(override="override_show_anyway", override_confidence=CONFIDENT)
+        result = rank_one(answers, dislike_scores={"Horror": DISLIKE_SCORE_CAP})
+        retained = DISLIKE_STRENGTH_CAP_FOR_PENALTY * OVERRIDE_PENALTY_RETAINED
+        self.assertEqual(result["final_score"], expected_final_score(TASTE - retained * DISLIKE_PENALTY_SCALE))
+
 
 class TestBusinessWeight(unittest.TestCase):
     def test_title_with_no_business_weight_uses_the_neutral_weight(self):
@@ -112,6 +138,24 @@ class TestBusinessWeight(unittest.TestCase):
     def test_promoted_title_gets_its_weight_times_the_business_share(self):
         result = rank_one(fixed_answers(), dislike_scores={}, business_weight=0.4)
         self.assertEqual(result["final_score"], expected_final_score(TASTE, business=0.4))
+
+    def test_promotion_is_ignored_for_a_declared_disliked_genre(self):
+        user = {**USER, "disliked_genres": ["Horror"]}
+        with patch(ASK, return_value=fixed_answers()):
+            result = rank_candidates(user, tiny_catalog(), [candidate(1, business_weight=0.4)], CONTEXT_INFO, {})[0]
+        self.assertEqual(result["final_score"], expected_final_score(TASTE, business=BUSINESS_WEIGHT_NEUTRAL))
+
+    def test_promotion_still_counts_when_the_dislike_is_a_different_genre(self):
+        user = {**USER, "disliked_genres": ["Comedy"]}
+        with patch(ASK, return_value=fixed_answers()):
+            result = rank_candidates(user, tiny_catalog(), [candidate(1, business_weight=0.4)], CONTEXT_INFO, {})[0]
+        self.assertEqual(result["final_score"], expected_final_score(TASTE, business=0.4))
+
+    def test_dislike_found_only_in_watch_history_does_not_switch_promotion_off(self):
+        # Only the declared list counts, a learned dislike score alone does not.
+        result = rank_one(fixed_answers(), dislike_scores={"Horror": 1.0}, business_weight=0.4)
+        self.assertEqual(result["final_score"], expected_final_score(
+            TASTE - DISLIKE_PENALTY_SCALE, business=0.4))
 
 
 class TestMatchPercent(unittest.TestCase):

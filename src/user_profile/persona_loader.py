@@ -250,6 +250,39 @@ def find_favourites(raw: List[str], catalog: Catalog) -> Tuple[List[int], List[s
     return found, warnings
 
 
+def find_blocked_titles(raw: List[str], catalog: Catalog) -> Tuple[List[int], List[str]]:
+    """
+    Level 2. Returns (movie ids to never recommend, warnings). A name blocks
+    EVERY title that contains it as whole words, ignoring capitals, accents and
+    a leading "The", so "Star Wars" blocks every Star Wars film while "Her"
+    does not block "Mother". Each block is listed in a warning so the user can
+    see exactly what went; a name that matches nothing gets a "did you mean".
+    """
+    padded_titles = {
+        movie_id: f" {normalize_title(movie['title'])} " for movie_id, movie in catalog.items()
+    }
+    by_title = titles_by_name(catalog)
+
+    blocked: List[int] = []
+    warnings: List[str] = []
+    for name in raw:
+        wanted = f" {normalize_title(name)} "
+        matched = [
+            movie_id for movie_id, title in padded_titles.items()
+            if wanted.strip() and wanted in title
+        ]
+        if not matched:
+            warnings.append(
+                f"'{name}' in 'never_recommend_titles' matched no title, nothing was blocked."
+                + _did_you_mean(suggest_titles(name, by_title))
+            )
+            continue
+        listing = ", ".join(sorted(_title_with_year(catalog[movie_id]) for movie_id in matched))
+        warnings.append(f"Never recommend '{name}' blocks {len(matched)} title(s): {listing}.")
+        blocked += [movie_id for movie_id in matched if movie_id not in blocked]
+    return blocked, warnings
+
+
 def _favourites_to_history(movie_ids: List[int], as_of: datetime) -> List[Dict[str, Any]]:
     """
     Cold start fix. A new user has no history, so collaborative filtering has
@@ -368,11 +401,14 @@ def build_persona_result(data: Dict[str, Any], catalog: Catalog, as_of: datetime
     warnings += people_warnings
     favourites_raw, favourite_errors = _read_string_list(data, "favourite_titles")
     errors += favourite_errors
+    blocked_raw, blocked_errors = _read_string_list(data, "never_recommend_titles")
+    errors += blocked_errors
 
     if errors:
         return PersonaResult(None, errors, warnings)
 
     favourite_ids, favourite_warnings = find_favourites(favourites_raw, catalog)
+    blocked_ids, blocked_warnings = find_blocked_titles(blocked_raw, catalog)
     history = (
         _favourites_to_history(favourite_ids, as_of)
         if favourite_ids else _genre_history(name, liked, disliked, catalog)
@@ -391,10 +427,10 @@ def build_persona_result(data: Dict[str, Any], catalog: Catalog, as_of: datetime
         "age_group": "not set",
         "taste_summary": _describe_taste(liked, disliked),
         "watch_history": history,
-        "hard_blocked_movie_ids": [],
+        "hard_blocked_movie_ids": blocked_ids,
         "current_session": [],
     }
-    return PersonaResult(user, [], warnings + favourite_warnings)
+    return PersonaResult(user, [], warnings + favourite_warnings + blocked_warnings)
 
 
 def load_persona_file(
