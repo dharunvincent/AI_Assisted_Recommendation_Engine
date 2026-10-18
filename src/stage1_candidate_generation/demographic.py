@@ -17,6 +17,8 @@ catalog. This is a simplification made for this portfolio project, not a
 claim that this is how a production demographic filter should be built.
 """
 
+from src.catalog_pools import trusted_titles
+
 AGE_GROUP_GENRE_PREFERENCE = {
     "13 to 17": ["Animation", "Adventure", "Comedy", "Fantasy"],
     "18 to 24": ["Action", "Comedy", "Sci-Fi", "Thriller"],
@@ -33,15 +35,13 @@ def generate(user, catalog, max_candidates=15):
     if not preferred_genres:
         return []
 
-    matches = []
-    for movie in catalog.values():
-        if movie["movie_id"] in watched_ids:
-            continue
-        if movie["avg_rating"] is None:
-            continue
-        if set(preferred_genres).intersection(movie["genres"]):
-            matches.append(movie)
-
+    # Only titles with enough ratings to trust. Without that, one 5.0 rating
+    # put an unknown film at the top. The sort is stable, so equal averages
+    # keep the "best known first" order from the shared helper.
+    matches = [
+        movie for movie in trusted_titles(catalog, watched_ids)
+        if set(preferred_genres).intersection(movie["genres"])
+    ]
     matches.sort(key=lambda movie: movie["avg_rating"], reverse=True)
 
     candidates = []

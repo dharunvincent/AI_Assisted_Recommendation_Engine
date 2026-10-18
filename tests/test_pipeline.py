@@ -23,7 +23,7 @@ from src.exclusion_filter.exclude import exclude
 from src.stage1_candidate_generation.content_based import generate as generate_content_based
 from src.pipeline import build_dislike_scores, print_results
 from src.stage1_candidate_generation.business_rules import validate_promoted_content
-from config.weights import STAGE1_SHORTLIST_MAX_SIZE, BUSINESS_WEIGHT_MAX_PROMOTION, BUSINESS_WEIGHT_NEUTRAL, MIN_RATINGS_FOR_QUALITY_FLOOR, SIGNAL_HALF_LIFE_DAYS
+from config.weights import STAGE1_SHORTLIST_MAX_SIZE, BUSINESS_WEIGHT_MAX_PROMOTION, BUSINESS_WEIGHT_NEUTRAL, MIN_RATINGS_TO_TRUST, SIGNAL_HALF_LIFE_DAYS
 
 
 class TestDecayFormula(unittest.TestCase):
@@ -137,7 +137,7 @@ class TestQualityFloor(unittest.TestCase):
         # A perfect average from only two raters is not trustworthy.
         catalog = {
             1: {"avg_rating": 5.0, "rating_count": 2},
-            2: {"avg_rating": 4.0, "rating_count": MIN_RATINGS_FOR_QUALITY_FLOOR},
+            2: {"avg_rating": 4.0, "rating_count": MIN_RATINGS_TO_TRUST},
         }
         shortlist = [{"movie_id": movie_id} for movie_id in catalog]
         user = {"watch_history": [], "min_avg_rating": 3.0}

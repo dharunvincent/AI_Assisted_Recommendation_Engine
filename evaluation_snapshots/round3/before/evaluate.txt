@@ -1,0 +1,21 @@
+
+Offline evaluation on 100 real MovieLens users, 500 hidden answers (5 per user)
+
+Stage 1 recall (hidden titles that reached the shortlist): 15.4%
+Recall of each generator on its own (before the exclusion filter and trim):
+  collaborative   10.0%
+  trending        7.4%
+  context_aware   6.4%
+  content_based   3.4%
+  business_rules  0.4%
+  demographic     0.0%
+  session_based   0.0%
+  diversity       0.0%
+
+Top 10                         Hit Rate    Recall
+  This engine (after stage 2)    17.0%      4.0%
+  Most popular titles            22.0%      5.8%
+
+NOTE: stage 2 uses the MOCK scorer. The stage 2 numbers measure the mock's simple
+rules, not a real JEV model. Catalog averages and rating counts still include the
+hidden ratings, a small known leak that also helps the popularity baseline.

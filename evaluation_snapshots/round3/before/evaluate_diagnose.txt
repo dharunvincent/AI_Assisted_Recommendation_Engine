@@ -1,0 +1,107 @@
+
+Offline evaluation on 100 real MovieLens users, 500 hidden answers (5 per user)
+
+Stage 1 recall (hidden titles that reached the shortlist): 15.4%
+Recall of each generator on its own (before the exclusion filter and trim):
+  collaborative   10.0%
+  trending        7.4%
+  context_aware   6.4%
+  content_based   3.4%
+  business_rules  0.4%
+  demographic     0.0%
+  session_based   0.0%
+  diversity       0.0%
+
+Top 10                         Hit Rate    Recall
+  This engine (after stage 2)    17.0%      4.0%
+  Most popular titles            22.0%      5.8%
+
+NOTE: stage 2 uses the MOCK scorer. The stage 2 numbers measure the mock's simple
+rules, not a real JEV model. Catalog averages and rating counts still include the
+hidden ratings, a small known leak that also helps the popularity baseline.
+
+Diagnosis: every hidden answer that reached the shortlist
+  Rank  Overlap  Taste before  Taste after  Penalty  Override  Compl.    Ctx  Sources
+     1        3         0.869        0.869    0.000        no   0.984  0.679  content_based, trending, context_aware, business_rules
+     1        3         0.953        0.857    0.700       yes   0.862  0.832  collaborative, trending, context_aware
+     2        4         1.000        1.000    0.000        no   0.859  0.531  content_based, trending
+     2        4         0.943        0.530    3.000       yes   0.878  0.494  collaborative
+     3        2         0.848        0.848    0.000        no   0.998  0.574  trending
+     3        1         0.566        0.566    0.000        no   0.947  0.631  content_based, trending, context_aware
+     4        4         1.000        0.711    2.100       yes   0.856  0.372  collaborative
+     5        5         0.906        0.906    0.000        no   0.831  0.427  collaborative
+     5        2         0.870        0.870    0.000        no   0.981  0.353  collaborative
+     5        4         1.000        0.731    1.959       yes   0.858  0.399  content_based
+     6        1         0.591        0.591    0.000        no   0.845  0.805  trending, context_aware
+     7        3         0.954        0.954    0.000        no   0.721  0.609  collaborative, trending, context_aware
+     7        3         0.868        0.455    3.000       yes   0.791  0.897  collaborative, trending, context_aware
+     8        2         0.869        0.676    1.400       yes   0.891  0.394  collaborative
+     8        3         0.943        0.665    2.019       yes   0.723  0.659  collaborative, context_aware
+     9        3         0.941        0.941    0.000        no   0.750  0.447  content_based
+     9        2         0.703        0.607    0.700       yes   0.937  0.558  trending
+    10        2         0.715        0.619    0.700       yes   0.935  0.576  collaborative
+    10        4         0.869        0.839    0.218       yes   0.745  0.772  collaborative, trending, context_aware
+    10        5         0.875        0.542    2.425       yes   0.779  0.877  content_based, collaborative, context_aware
+    11        2         0.735        0.649    0.156        no   0.933  0.484  collaborative
+    11        4         1.000        0.587    3.000       yes   0.815  0.485  collaborative
+    13        3         0.848        0.655    1.400       yes   0.919  0.594  collaborative
+    14        2         0.846        0.846    0.000        no   0.836  0.727  trending, context_aware
+    14        2         0.698        0.602    0.700       yes   0.812  0.688  collaborative, trending, context_aware
+    14        3         0.716        0.303    3.000       yes   0.748  0.883  collaborative, trending, context_aware
+    15        2         0.831        0.831    0.000        no   0.828  0.555  collaborative
+    15        3         1.000        0.615    0.700        no   0.847  0.706  collaborative, context_aware
+    15        0         0.635        0.000    1.400        no   0.834  0.845  collaborative, trending, context_aware
+    16        3         0.790        0.382    2.966       yes   0.730  0.620  collaborative, trending, context_aware
+    16        1         0.728        0.728    0.000        no   0.998  0.574  trending
+    16        5         1.000        0.741    1.883       yes   0.603  0.315  content_based
+    16        5         1.000        0.959    0.301       yes   0.692  0.437  content_based
+    16        4         0.831        0.831    0.000        no   0.775  0.483  content_based
+    17        1         0.673        0.673    0.000        no   0.856  0.865  collaborative, trending, context_aware
+    17        4         0.872        0.728    0.261        no   0.663  0.817  content_based, context_aware
+    17        4         1.000        0.904    0.700       yes   0.591  0.497  collaborative
+    17        3         0.762        0.349    3.000       yes   0.780  0.503  collaborative
+    17        3         0.767        0.354    3.000       yes   0.649  0.566  collaborative
+    18        2         0.693        0.693    0.000        no   1.000  0.528  collaborative, trending
+    18        2         0.621        0.208    3.000       yes   0.778  0.786  collaborative, trending, context_aware
+    19        2         0.598        0.598    0.000        no   0.853  0.870  collaborative, context_aware
+    19        2         0.772        0.503    1.959       yes   0.916  0.487  collaborative
+    21        4         1.000        1.000    0.000        no   0.659  0.520  collaborative
+    22        2         0.711        0.711    0.000        no   0.845  0.805  trending, context_aware
+    23        2         0.781        0.781    0.000        no   0.697  0.737  collaborative, trending, context_aware
+    23        5         1.000        1.000    0.000        no   0.682  0.432  content_based
+    24        3         0.802        0.000    3.000        no   0.888  0.788  collaborative, trending, context_aware
+    25        2         0.630        0.000    2.100        no   0.806  0.663  collaborative, trending, context_aware
+    26        1         0.591        0.591    0.000        no   0.845  0.805  trending, context_aware
+    26        0         0.491        0.000    1.400        no   0.754  0.575  collaborative, trending
+    26        3         0.799        0.799    0.000        no   0.550  0.569  content_based
+    27        2         0.810        0.000    3.000        no   0.768  0.790  collaborative, trending, context_aware
+    28        4         1.000        0.230    1.400        no   0.850  0.336  content_based, trending
+    29        2         0.796        0.700    0.700       yes   0.792  0.309  trending
+    30        4         1.000        0.000    3.000        no   0.777  0.668  collaborative, trending, context_aware
+    30        1         0.676        0.291    0.700        no   0.792  0.309  trending
+    31        3         0.966        0.176    1.436        no   0.694  0.755  context_aware
+    31        5         1.000        0.000    2.100        no   0.865  0.440  collaborative
+    32        2         0.653        0.461    1.400       yes   0.728  0.370  collaborative
+    32        3         0.866        0.743    0.223        no   0.752  0.377  content_based
+    32        4         0.972        0.000    2.005        no   0.723  0.779  content_based, trending, context_aware
+    35        2         0.859        0.474    0.700        no   0.668  0.374  collaborative
+    36        2         0.660        0.660    0.000        no   0.775  0.473  collaborative
+    37        2         0.610        0.610    0.000        no   0.742  0.312  collaborative
+    37        1         0.652        0.652    0.000        no   0.736  0.321  collaborative
+    37        2         0.690        0.000    3.000        no   0.751  0.401  content_based, collaborative, trending
+    38        3         0.940        0.000    3.000        no   0.632  0.497  collaborative
+    39        4         1.000        0.230    1.400        no   0.694  0.651  collaborative, trending, context_aware, business_rules
+    40        2         0.786        0.000    3.000        no   0.745  0.335  collaborative
+    41        1         0.492        0.000    0.915        no   0.667  0.812  trending, context_aware
+    43        1         0.557        0.557    0.000        no   0.692  0.637  trending, context_aware
+    43        2         0.596        0.211    0.700        no   0.722  0.644  collaborative, trending, context_aware
+    44        1         0.763        0.000    1.400        no   0.844  0.389  collaborative, trending
+    46        3         0.752        0.367    0.700        no   0.657  0.507  collaborative
+    47        3         0.793        0.627    0.301        no   0.678  0.551  collaborative
+    47        4         1.000        0.000    2.800        no   0.619  0.307  content_based
+
+Diagnosis summary
+  (a) Hidden answers on the shortlist: 77, average final rank 20.8. 20 of them made the top 10 (average rank 5.8).
+  (b) Shortlisted titles with taste fit pushed to 0 by the dislike penalty: 849 of 4193
+  (c) Shortlisted titles with taste bias capped at 1.0: 575 of 4193
+  (d) Hidden answers found by collaborative filtering that made the top 10: 12 of 50 (24.0%)

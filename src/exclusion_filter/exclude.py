@@ -38,7 +38,7 @@ set never removes anything.
 
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple
 
-from config.weights import MIN_IMDB_VOTES_FOR_FLOOR, MIN_RATINGS_FOR_QUALITY_FLOOR
+from config.weights import MIN_IMDB_VOTES_FOR_FLOOR, MIN_RATINGS_TO_TRUST
 
 Movie = Optional[Dict[str, Any]]
 # A rule takes a movie id and its catalog record (None if the catalog does not
@@ -70,7 +70,7 @@ def _movielens_floor_rule(min_avg_rating: float) -> Rule:
         return (
             movie is None
             or movie["avg_rating"] is None
-            or movie["rating_count"] < MIN_RATINGS_FOR_QUALITY_FLOOR
+            or movie["rating_count"] < MIN_RATINGS_TO_TRUST
             or movie["avg_rating"] < min_avg_rating
         )
     return removes

@@ -42,6 +42,7 @@ import math
 import os
 from collections import defaultdict, Counter
 
+from src.catalog_pools import is_trusted
 from config.weights import (
     LIKED_COMPLETION_THRESHOLD,
     COLLAB_HIGH_RATING_THRESHOLD,
@@ -124,10 +125,13 @@ def generate(user, catalog, max_candidates=15, similarity_table=None):
             if related_id not in watched_ids:
                 score_board[related_id] += similarity
 
+    # Take the strongest links first, but skip titles without enough ratings:
+    # a link needs only a few shared fans, so a thinly rated title could
+    # otherwise get through. The cut to max_candidates comes AFTER this.
     picks = [
-        (movie_id, score) for movie_id, score in score_board.most_common(max_candidates)
-        if movie_id in catalog
-    ]
+        (movie_id, score) for movie_id, score in score_board.most_common()
+        if movie_id in catalog and is_trusted(catalog[movie_id])
+    ][:max_candidates]
     # Strength is each pick's score relative to the best pick, so it is 0 to 1
     # for every user whatever the size of their history. Stage 2 reads it.
     best_score = picks[0][1] if picks else 1.0

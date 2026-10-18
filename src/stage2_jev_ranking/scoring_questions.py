@@ -21,6 +21,7 @@ the business_rules generator in stage 1 and is combined separately in
 rank.py.
 """
 
+from src.catalog_pools import NEUTRAL_RATING, shrunk_rating
 from src.stage1_candidate_generation.context_aware import genres_for_context
 from src.stage2_jev_ranking.jev_client import Score, Choice
 from config.weights import (
@@ -36,7 +37,7 @@ from config.weights import (
     OVERRIDE_BIAS_WEAK_FIT,
     OVERRIDE_MIN_GENRE_OVERLAP,
     OVERRIDE_STANDOUT_RATING,
-    MIN_RATINGS_FOR_QUALITY_FLOOR,
+    MIN_RATINGS_TO_TRUST,
 )
 
 
@@ -109,7 +110,7 @@ def is_strong_override_fit(movie, genre_overlap_count):
         genre_overlap_count >= OVERRIDE_MIN_GENRE_OVERLAP
         and rating is not None
         and rating >= OVERRIDE_STANDOUT_RATING
-        and movie.get("rating_count", 0) >= MIN_RATINGS_FOR_QUALITY_FLOOR
+        and movie.get("rating_count", 0) >= MIN_RATINGS_TO_TRUST
     )
 
 
@@ -122,8 +123,19 @@ def context_taste_bias(movie, context):
     return CONTEXT_BIAS_MATCHES_BUCKET if fits_now else CONTEXT_BIAS_DEFAULT
 
 
+def completion_bias(movie, prior_rating):
+    """
+    Pure. Expected completion likelihood: a well regarded movie in the real
+    MovieLens data is a reasonable proxy for "most people who start this
+    finish it". The average is shrunk toward the catalog average first, so a
+    title only looks near perfect when many people agree, not when one did.
+    """
+    return shrunk_rating(movie["avg_rating"], movie.get("rating_count", 0), prior_rating) / 5.0
+
+
 def build_questions(
-    movie, candidate, context, dislike_penalty, genre_overlap_count, preferred_people_count=0
+    movie, candidate, context, dislike_penalty, genre_overlap_count, preferred_people_count=0,
+    prior_rating=NEUTRAL_RATING,
 ):
     """
     Returns the dict of questions to send to jev_client.ask(), each
@@ -139,12 +151,6 @@ def build_questions(
         genre_overlap_count, preferred_people_count, candidate.get("collab_strength", 0.0)
     )
 
-    # Rough expectation for completion likelihood, a well regarded movie
-    # in the real MovieLens data is a reasonable proxy for "most people
-    # who start this finish it".
-    rating = movie["avg_rating"] if movie["avg_rating"] is not None else 3.0
-    completion_bias = rating / 5.0
-
     context_bias = context_taste_bias(movie, context)
 
     return {
@@ -155,7 +161,7 @@ def build_questions(
         ),
         "completion_likelihood": Score(
             "How likely is this user to finish watching this?",
-            bias_hint=completion_bias,
+            bias_hint=completion_bias(movie, prior_rating),
         ),
         "context_fit": Score(
             "How well does this fit the user's current viewing context?",

@@ -14,14 +14,14 @@ from config.weights import (
     OVERRIDE_BIAS_WEAK_FIT,
     OVERRIDE_MIN_GENRE_OVERLAP,
     OVERRIDE_STANDOUT_RATING,
-    MIN_RATINGS_FOR_QUALITY_FLOOR,
+    MIN_RATINGS_TO_TRUST,
     CONTEXT_BIAS_MATCHES_BUCKET,
     CONTEXT_BIAS_DEFAULT,
 )
 from src.stage1_candidate_generation.context_aware import genres_for_context
-from src.stage2_jev_ranking.scoring_questions import build_questions, context_taste_bias, is_strong_override_fit
+from src.stage2_jev_ranking.scoring_questions import build_questions, completion_bias, context_taste_bias, is_strong_override_fit
 
-ENOUGH = MIN_RATINGS_FOR_QUALITY_FLOOR
+ENOUGH = MIN_RATINGS_TO_TRUST
 CONTEXT = {"time_of_day": "evening", "day_of_week": "Friday"}  # weekend evening bucket
 
 
@@ -85,6 +85,27 @@ class TestContextBias(unittest.TestCase):
         # Same fallback the generator has: no day and no time means a weekday daytime bucket.
         self.assertEqual(context_taste_bias({"genres": ["Comedy"]}, {}), CONTEXT_BIAS_MATCHES_BUCKET)
         self.assertEqual(context_taste_bias({"genres": ["Thriller"]}, {}), CONTEXT_BIAS_DEFAULT)
+
+
+class TestCompletionBias(unittest.TestCase):
+    PRIOR = 3.5
+
+    def test_one_perfect_rating_no_longer_gives_a_perfect_completion_bias(self):
+        self.assertLess(completion_bias(movie(5.0, rating_count=1), self.PRIOR), 0.75)
+
+    def test_a_well_known_title_still_scores_close_to_its_own_average(self):
+        shawshank_like = completion_bias(movie(4.43, rating_count=317), self.PRIOR)
+        self.assertAlmostEqual(shawshank_like, 4.43 / 5, delta=0.02)
+
+    def test_well_known_4_4_beats_a_one_rater_5_0(self):
+        self.assertGreater(
+            completion_bias(movie(4.4, rating_count=300), self.PRIOR),
+            completion_bias(movie(5.0, rating_count=1), self.PRIOR),
+        )
+
+    def test_the_question_carries_the_shrunk_value(self):
+        questions = build_questions(movie(5.0, rating_count=1), {"sources": []}, CONTEXT, 0.0, 0, prior_rating=self.PRIOR)
+        self.assertEqual(questions["completion_likelihood"].bias_hint, completion_bias(movie(5.0, rating_count=1), self.PRIOR))
 
 
 if __name__ == "__main__":

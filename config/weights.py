@@ -93,22 +93,19 @@ STAGE1_SHORTLIST_MIN_SIZE = 30
 STAGE1_SHORTLIST_MAX_SIZE = 50
 
 # -----------------------------------------------------------------------
-# QUALITY FLOOR MINIMUM RATINGS
-# A title only passes a user's quality floor if at least this many people
-# rated it. A high average from only a few raters is not trustworthy, for
-# example one title with two perfect ratings would otherwise beat a title
-# with thousands of ratings averaging slightly lower.
+# MINIMUM RATINGS TO TRUST A TITLE'S AVERAGE
+# One number for "enough people rated this". An average from only a few
+# raters is luck, not quality: a film with one perfect rating would beat a
+# film with thousands of ratings averaging slightly lower. A title with fewer
+# ratings than this is
+#   - never picked by a stage 1 generator that chooses titles from the
+#     catalog (see src/catalog_pools.py),
+#   - not allowed through a user's MovieLens quality floor, and
+#   - never a "standout" for the dislike override.
+# It used to be three separate copies of 20 (quality floor, content based,
+# diversity). One name means they cannot drift apart.
 # -----------------------------------------------------------------------
-MIN_RATINGS_FOR_QUALITY_FLOOR = 20
-
-# -----------------------------------------------------------------------
-# CONTENT BASED MINIMUM RATINGS
-# When the content based generator picks titles for a user's preferred
-# genres, it only considers titles rated by at least this many people.
-# Without it, obscure titles with a handful of ratings could take slots
-# that better known titles in the same genre should have.
-# -----------------------------------------------------------------------
-MIN_RATINGS_FOR_CONTENT_BASED = 20
+MIN_RATINGS_TO_TRUST = 20
 
 # -----------------------------------------------------------------------
 # WHAT COUNTS AS LIKED, NEUTRAL AND DISLIKED
@@ -169,6 +166,17 @@ OVERRIDE_PENALTY_RETAINED = 0.25
 # with things the user liked.
 TASTE_BIAS_BASE = 0.5
 TASTE_BIAS_PER_GENRE_OVERLAP = 0.12
+# Completion bias comes from the title's average rating, but an average from a
+# few raters is shaky: one perfect 5.0 used to give a perfect completion
+# bias. The average is pulled toward the catalog wide average first, as if
+# this many extra raters had given exactly the catalog average:
+#   shrunk = (count x average + STRENGTH x catalog average) / (count + STRENGTH)
+# With 20, a title with 20 raters sits half way between its own average and
+# the catalog's, one with 200 raters is 91 percent its own, one with a single
+# rater is almost the catalog average. It is the same number as
+# MIN_RATINGS_TO_TRUST on purpose: where we stop picking a title is where we
+# start to half believe it.
+RATING_SHRINKAGE_STRENGTH = 20
 # Expected context fit: higher when the title's own genres fit the current
 # context bucket (see CONTEXT_GENRE_RULES in context_aware.py). It used to
 # depend on which generator happened to find the title, which handed about
@@ -194,7 +202,7 @@ OVERRIDE_MIN_GENRE_OVERLAP = 2
 # title shares two, which let an ordinary crowd pleaser like Toy Story (3.92)
 # overrule the animation dislike. The strong override chance also needs a
 # standout average rating. 4.2 of 5 was chosen from the catalog: among the
-# 1297 titles with at least MIN_RATINGS_FOR_QUALITY_FLOOR ratings, 39 (3 percent)
+# 1297 titles with at least MIN_RATINGS_TO_TRUST ratings, 39 (3 percent)
 # reach 4.2, the real classics. Counting titles with any number of ratings,
 # 972 reach it, but nearly all of those are averages of a handful of raters, so
 # the title must also have the minimum rating count. A guess to be tuned on real
@@ -208,10 +216,6 @@ OVERRIDE_STANDOUT_RATING = 4.2
 COLLAB_HIGH_RATING_THRESHOLD = 4.0
 # Diversity injection only offers titles rated at least this well.
 DIVERSITY_MIN_AVG_RATING = 3.8
-# Diversity injection also needs this many ratings behind the average. Same
-# reason as MIN_RATINGS_FOR_QUALITY_FLOOR: an average of 4.5 from two raters
-# is luck, not quality, and a random pick would otherwise surface such titles.
-DIVERSITY_MIN_RATINGS = 20
 
 # -----------------------------------------------------------------------
 # BUSINESS WEIGHT: PROMOTION IS A SMALL NUDGE
@@ -262,7 +266,7 @@ MAX_SUGGESTIONS = 3
 # IMDB RATING FLOOR MINIMUM VOTES
 # When a persona sets min_imdb_rating, a title only passes if at least this
 # many people voted for it on IMDb. A high rating from a handful of voters
-# cannot be trusted, same idea as MIN_RATINGS_FOR_QUALITY_FLOOR above for the
+# cannot be trusted, same idea as MIN_RATINGS_TO_TRUST above for the
 # MovieLens floor. A title with no IMDb rating at all is removed too.
 # -----------------------------------------------------------------------
 MIN_IMDB_VOTES_FOR_FLOOR = 1000

@@ -14,7 +14,7 @@ from src.stage1_candidate_generation import collaborative
 from src.stage1_candidate_generation.merge_shortlist import merge
 from src.stage2_jev_ranking.scoring_questions import build_questions, collab_taste_boost, taste_bias
 
-CATALOG = {i: {"movie_id": i, "title": f"M{i}", "avg_rating": 3.0, "genres": ["Drama"]} for i in (1, 2, 3, 4)}
+CATALOG = {i: {"movie_id": i, "title": f"M{i}", "avg_rating": 3.0, "rating_count": 50, "genres": ["Drama"]} for i in (1, 2, 3, 4)}
 USER = {"watch_history": [{"movie_id": 1, "completion_pct": 0.95}]}
 
 

@@ -11,13 +11,13 @@ Run with:  python3 -m unittest tests.test_generators
 import unittest
 
 from config.weights import (
-    MIN_RATINGS_FOR_CONTENT_BASED, LIKED_COMPLETION_THRESHOLD,
-    DIVERSITY_MIN_AVG_RATING, DIVERSITY_MIN_RATINGS,
+    MIN_RATINGS_TO_TRUST, LIKED_COMPLETION_THRESHOLD,
+    DIVERSITY_MIN_AVG_RATING,
 )
 from src.stage1_candidate_generation import content_based, context_aware, diversity
 from src.stage1_candidate_generation.business_rules import business_weight_for_user
 
-ENOUGH = MIN_RATINGS_FOR_CONTENT_BASED
+ENOUGH = MIN_RATINGS_TO_TRUST
 
 
 def movie(movie_id, genres, rating_count=ENOUGH, avg_rating=4.0):
@@ -84,8 +84,8 @@ class TestDiversity(unittest.TestCase):
         return {c["movie_id"] for c in found}
 
     def test_a_well_rated_title_with_too_few_ratings_is_never_offered(self):
-        lucky = movie(2, ["Horror"], rating_count=DIVERSITY_MIN_RATINGS - 1, avg_rating=5.0)
-        solid = movie(3, ["Horror"], rating_count=DIVERSITY_MIN_RATINGS, avg_rating=DIVERSITY_MIN_AVG_RATING)
+        lucky = movie(2, ["Horror"], rating_count=MIN_RATINGS_TO_TRUST - 1, avg_rating=5.0)
+        solid = movie(3, ["Horror"], rating_count=MIN_RATINGS_TO_TRUST, avg_rating=DIVERSITY_MIN_AVG_RATING)
         self.assertEqual(self.offered_ids(lucky, solid), {3})
 
     def test_the_other_rules_still_hold(self):
