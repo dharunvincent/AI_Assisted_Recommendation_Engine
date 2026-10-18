@@ -62,13 +62,15 @@ def _add_imdb_fields(catalog: Dict[int, Dict[str, Any]], imdb_path: str) -> None
             movie["cast"] = _split_names(row["cast"])
 
 
-def load_catalog(imdb_path: str = IMDB_ENRICHED_PATH):
+def load_catalog(imdb_path: str = IMDB_ENRICHED_PATH, data_folder: str = DATA_FOLDER):
     """
     Returns a dict keyed by movie_id, each value a movie record with
     average rating and rating count already worked out from ratings.csv.
     """
-    movies_path = os.path.join(DATA_FOLDER, "movies.csv")
-    ratings_path = os.path.join(DATA_FOLDER, "ratings.csv")
+    # data_folder is a parameter so tests can point at a tiny fake folder and
+    # never need the real download.
+    movies_path = os.path.join(data_folder, "movies.csv")
+    ratings_path = os.path.join(data_folder, "ratings.csv")
 
     if not os.path.exists(movies_path):
         raise FileNotFoundError(
