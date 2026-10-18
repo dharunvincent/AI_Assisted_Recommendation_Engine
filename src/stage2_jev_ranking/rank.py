@@ -88,7 +88,7 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
             user, movie, candidate, context, dislike_penalty, preferred_people
         )
         questions = scoring_questions.build_questions(
-            movie, candidate, dislike_penalty, genre_overlap_count, len(preferred_people)
+            movie, candidate, context, dislike_penalty, genre_overlap_count, len(preferred_people)
         )
         jev_answers = jev_client.ask(state, questions)
 

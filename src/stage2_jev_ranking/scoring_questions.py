@@ -21,13 +21,14 @@ the business_rules generator in stage 1 and is combined separately in
 rank.py.
 """
 
+from src.stage1_candidate_generation.context_aware import genres_for_context
 from src.stage2_jev_ranking.jev_client import Score, Choice
 from config.weights import (
     TASTE_BIAS_BASE,
     TASTE_BIAS_PER_GENRE_OVERLAP,
     TASTE_BIAS_PER_PREFERRED_PERSON,
     TASTE_BIAS_PEOPLE_CAP,
-    CONTEXT_BIAS_FROM_CONTEXT_GENERATOR,
+    CONTEXT_BIAS_MATCHES_BUCKET,
     CONTEXT_BIAS_DEFAULT,
     OVERRIDE_BIAS_STRONG_FIT,
     OVERRIDE_BIAS_WEAK_FIT,
@@ -101,8 +102,17 @@ def is_strong_override_fit(movie, genre_overlap_count):
     )
 
 
+def context_taste_bias(movie, context):
+    """
+    Pure. Expected context fit, based on the title alone: higher when one of
+    its genres is in the current context bucket, whichever generator found it.
+    """
+    fits_now = set(genres_for_context(context)).intersection(movie["genres"])
+    return CONTEXT_BIAS_MATCHES_BUCKET if fits_now else CONTEXT_BIAS_DEFAULT
+
+
 def build_questions(
-    movie, candidate, dislike_penalty, genre_overlap_count, preferred_people_count=0
+    movie, candidate, context, dislike_penalty, genre_overlap_count, preferred_people_count=0
 ):
     """
     Returns the dict of questions to send to jev_client.ask(), each
@@ -122,12 +132,7 @@ def build_questions(
     rating = movie["avg_rating"] if movie["avg_rating"] is not None else 3.0
     completion_bias = rating / 5.0
 
-    # Rough expectation for context fit, if this candidate already came
-    # from the context_aware generator in stage 1, it already fits the
-    # current moment reasonably well.
-    context_bias = (
-        CONTEXT_BIAS_FROM_CONTEXT_GENERATOR if "context_aware" in candidate["sources"] else CONTEXT_BIAS_DEFAULT
-    )
+    context_bias = context_taste_bias(movie, context)
 
     return {
         "taste_fit": Score(

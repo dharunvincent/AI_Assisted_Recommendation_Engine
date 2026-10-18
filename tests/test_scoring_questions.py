@@ -15,10 +15,14 @@ from config.weights import (
     OVERRIDE_MIN_GENRE_OVERLAP,
     OVERRIDE_STANDOUT_RATING,
     MIN_RATINGS_FOR_QUALITY_FLOOR,
+    CONTEXT_BIAS_MATCHES_BUCKET,
+    CONTEXT_BIAS_DEFAULT,
 )
-from src.stage2_jev_ranking.scoring_questions import build_questions, is_strong_override_fit
+from src.stage1_candidate_generation.context_aware import genres_for_context
+from src.stage2_jev_ranking.scoring_questions import build_questions, context_taste_bias, is_strong_override_fit
 
 ENOUGH = MIN_RATINGS_FOR_QUALITY_FLOOR
+CONTEXT = {"time_of_day": "evening", "day_of_week": "Friday"}  # weekend evening bucket
 
 
 def movie(avg_rating, rating_count=ENOUGH):
@@ -26,7 +30,7 @@ def movie(avg_rating, rating_count=ENOUGH):
 
 
 def override_hint(a_movie, overlap, dislike_penalty=1.0):
-    questions = build_questions(a_movie, {"sources": ["test"]}, dislike_penalty, overlap)
+    questions = build_questions(a_movie, {"sources": ["test"]}, CONTEXT, dislike_penalty, overlap)
     return questions["dislike_override"].bias_hint
 
 
@@ -54,6 +58,33 @@ class TestStrongOverrideFit(unittest.TestCase):
 
     def test_no_dislike_penalty_gives_the_weak_hint_even_for_a_standout(self):
         self.assertEqual(override_hint(movie(4.6), 3, dislike_penalty=0.0), OVERRIDE_BIAS_WEAK_FIT)
+
+
+class TestContextBias(unittest.TestCase):
+    def test_title_with_a_bucket_genre_gets_the_high_bias(self):
+        self.assertEqual(context_taste_bias({"genres": ["Sci-Fi", "Drama"]}, CONTEXT), CONTEXT_BIAS_MATCHES_BUCKET)
+
+    def test_title_without_a_bucket_genre_gets_the_default_bias(self):
+        self.assertEqual(context_taste_bias({"genres": ["Documentary"]}, CONTEXT), CONTEXT_BIAS_DEFAULT)
+
+    def test_which_generator_found_the_title_makes_no_difference(self):
+        a_movie = {"title": "T", "avg_rating": 3.0, "genres": ["Documentary"]}
+        for sources in (["context_aware"], ["trending"], ["context_aware", "collaborative"]):
+            questions = build_questions(a_movie, {"sources": sources}, CONTEXT, 0.0, 0)
+            self.assertEqual(questions["context_fit"].bias_hint, CONTEXT_BIAS_DEFAULT)
+
+    def test_bias_follows_the_bucket_the_generator_uses(self):
+        # Same bucket logic as the generator: Friday evening is weekend evening, daytime is not.
+        daytime = {"time_of_day": "daytime", "day_of_week": "Friday"}
+        self.assertIn("Action", genres_for_context(CONTEXT))
+        self.assertNotIn("Action", genres_for_context(daytime))
+        self.assertEqual(context_taste_bias({"genres": ["Action"]}, daytime), CONTEXT_BIAS_DEFAULT)
+        self.assertEqual(context_taste_bias({"genres": ["Action"]}, CONTEXT), CONTEXT_BIAS_MATCHES_BUCKET)
+
+    def test_empty_context_reads_as_weekday_daytime(self):
+        # Same fallback the generator has: no day and no time means a weekday daytime bucket.
+        self.assertEqual(context_taste_bias({"genres": ["Comedy"]}, {}), CONTEXT_BIAS_MATCHES_BUCKET)
+        self.assertEqual(context_taste_bias({"genres": ["Thriller"]}, {}), CONTEXT_BIAS_DEFAULT)
 
 
 if __name__ == "__main__":

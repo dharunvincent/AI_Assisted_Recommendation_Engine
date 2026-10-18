@@ -165,9 +165,11 @@ OVERRIDE_PENALTY_RETAINED = 0.25
 # with things the user liked.
 TASTE_BIAS_BASE = 0.5
 TASTE_BIAS_PER_GENRE_OVERLAP = 0.12
-# Expected context fit: higher when the title already came from the
-# context aware generator in stage 1.
-CONTEXT_BIAS_FROM_CONTEXT_GENERATOR = 0.75
+# Expected context fit: higher when the title's own genres fit the current
+# context bucket (see CONTEXT_GENRE_RULES in context_aware.py). It used to
+# depend on which generator happened to find the title, which handed about
+# 4.5 free points to 15 popular titles for every user. Now the title decides.
+CONTEXT_BIAS_MATCHES_BUCKET = 0.75
 CONTEXT_BIAS_DEFAULT = 0.45
 # Expected answer to the override question: strong when the title shares at
 # least OVERRIDE_MIN_GENRE_OVERLAP liked genres and a penalty is active,
