@@ -93,7 +93,7 @@ def _closest(wanted: str, candidates: List[str]) -> List[str]:
     )
 
 
-def _closest_people(wanted: str, known: Dict[str, str]) -> List[str]:
+def closest_people(wanted: str, known: Dict[str, str]) -> List[str]:
     """
     Like _closest, but names with the same last word come first. Plain text
     similarity ranks "Chris Noonan" above "Christopher Nolan" for "Chris Nolan",
@@ -136,7 +136,7 @@ def _read_number(
     return value, []
 
 
-def _read_limits(data: Dict[str, Any]) -> Tuple[Dict[str, Optional[float]], List[str]]:
+def read_limits(data: Dict[str, Any]) -> Tuple[Dict[str, Optional[float]], List[str]]:
     """Level 1 checks on year_from, year_to and min_imdb_rating."""
     limits: Dict[str, Optional[float]] = {}
     errors: List[str] = []
@@ -153,7 +153,7 @@ def _read_limits(data: Dict[str, Any]) -> Tuple[Dict[str, Optional[float]], List
     return limits, errors
 
 
-def _clean_genres(
+def clean_genres(
     raw: List[str], valid_genres: List[str], field: str
 ) -> Tuple[List[str], List[str]]:
     """
@@ -173,7 +173,7 @@ def _clean_genres(
     return kept, warnings
 
 
-def _people_in_catalog(catalog: Catalog, field: str) -> Dict[str, str]:
+def people_in_catalog(catalog: Catalog, field: str) -> Dict[str, str]:
     """Lower case name mapped to its proper spelling, for every director or actor."""
     return {name.lower(): name for movie in catalog.values() for name in movie[field]}
 
@@ -191,7 +191,7 @@ def _clean_people(
         if name.lower() in known:
             kept.append(known[name.lower()])
         else:
-            suggestions = _closest_people(name.lower(), known)
+            suggestions = closest_people(name.lower(), known)
             warnings.append(
                 f"'{name}' in '{field}' was not found in the IMDb data, skipped."
                 + _did_you_mean(suggestions)
@@ -204,24 +204,37 @@ def _title_with_year(movie: Dict[str, Any]) -> str:
     return f"{movie['title']} ({movie['year']})"
 
 
-def _find_favourites(raw: List[str], catalog: Catalog) -> Tuple[List[int], List[str]]:
+def titles_by_name(catalog: Catalog) -> Dict[str, List[Dict[str, Any]]]:
+    """Movies grouped by normalized title, so "Heat" finds every movie called Heat."""
+    by_title: Dict[str, List[Dict[str, Any]]] = {}
+    for movie in catalog.values():
+        by_title.setdefault(normalize_title(movie["title"]), []).append(movie)
+    return by_title
+
+
+def suggest_titles(
+    title: str, by_title: Dict[str, List[Dict[str, Any]]]
+) -> List[str]:
+    """Close matches for a title that was not found, like "Heat (1995)"."""
+    close = _closest(normalize_title(title), list(by_title))
+    return [_title_with_year(by_title[key][0]) for key in close]
+
+
+def find_favourites(raw: List[str], catalog: Catalog) -> Tuple[List[int], List[str]]:
     """
     Level 2. Returns the movie ids of the favourites that were found.
     A title not found is skipped with close matches. When two movies share
     a title, the one with the most MovieLens ratings is used and the warning
     says which one, so a wrong pick is easy to spot.
     """
-    by_title: Dict[str, List[Dict[str, Any]]] = {}
-    for movie in catalog.values():
-        by_title.setdefault(normalize_title(movie["title"]), []).append(movie)
+    by_title = titles_by_name(catalog)
 
     found: List[int] = []
     warnings: List[str] = []
     for title in raw:
         matches = by_title.get(normalize_title(title))
         if not matches:
-            close = _closest(normalize_title(title), list(by_title))
-            suggestions = [_title_with_year(by_title[key][0]) for key in close]
+            suggestions = suggest_titles(title, by_title)
             warnings.append(
                 f"Favourite '{title}' was not found, skipped." + _did_you_mean(suggestions)
             )
@@ -280,15 +293,20 @@ def _describe_taste(liked: List[str], disliked: List[str]) -> str:
     return text + (f", dislikes {', '.join(disliked)}" if disliked else "")
 
 
+def valid_genres_in(catalog: Catalog) -> List[str]:
+    """Every genre in the catalog, sorted. The only list of valid genres."""
+    return sorted({genre for movie in catalog.values() for genre in movie["genres"]})
+
+
 def _read_genre_fields(
     data: Dict[str, Any], catalog: Catalog
 ) -> Tuple[List[str], List[str], List[str], List[str]]:
     """Reads and cleans liked and disliked genres. Returns (liked, disliked, errors, warnings)."""
-    valid_genres = sorted({genre for movie in catalog.values() for genre in movie["genres"]})
+    valid_genres = valid_genres_in(catalog)
     errors, warnings, cleaned = [], [], {}
     for field in ["liked_genres", "disliked_genres"]:
         raw, new_errors = _read_string_list(data, field)
-        cleaned[field], new_warnings = _clean_genres(raw, valid_genres, field)
+        cleaned[field], new_warnings = clean_genres(raw, valid_genres, field)
         errors += new_errors
         warnings += new_warnings
     if not cleaned["liked_genres"] and not errors:
@@ -316,7 +334,7 @@ def _read_people_fields(
         errors += new_errors
         people[field] = []
         if imdb_ready:
-            known = _people_in_catalog(catalog, "directors" if "director" in field else "cast")
+            known = people_in_catalog(catalog, "directors" if "director" in field else "cast")
             people[field], new_warnings = _clean_people(raw, known, field)
             warnings += new_warnings
     return people, errors, warnings
@@ -336,7 +354,7 @@ def build_persona_result(data: Dict[str, Any], catalog: Catalog, as_of: datetime
     name = data.get("name")
     errors = [] if isinstance(name, str) and name.strip() else ["'name' is missing or empty."]
     liked, disliked, genre_errors, warnings = _read_genre_fields(data, catalog)
-    limits, limit_errors = _read_limits(data)
+    limits, limit_errors = read_limits(data)
     errors += genre_errors + limit_errors
 
     imdb_ready = catalog_has_imdb_data(catalog)
@@ -354,7 +372,7 @@ def build_persona_result(data: Dict[str, Any], catalog: Catalog, as_of: datetime
     if errors:
         return PersonaResult(None, errors, warnings)
 
-    favourite_ids, favourite_warnings = _find_favourites(favourites_raw, catalog)
+    favourite_ids, favourite_warnings = find_favourites(favourites_raw, catalog)
     history = (
         _favourites_to_history(favourite_ids, as_of)
         if favourite_ids else _genre_history(name, liked, disliked, catalog)

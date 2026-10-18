@@ -13,15 +13,16 @@ import csv
 import os
 import re
 from datetime import date
-from typing import Any, Dict, List
+from typing import Any, Dict, List, NamedTuple, Optional
 
-from config.weights import PRINTED_RESULT_COUNT, SHORT_LIST_WARNING_BELOW
+from config.weights import SHORT_LIST_WARNING_BELOW
 
 RESULTS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
 CSV_COLUMNS = [
     "rank", "title", "year", "imdb_rating", "directors", "top_cast",
     "final_score", "badge", "main_reason", "all_reasons",
 ]
+BADGE_MARK = "✓"  # shown when the engine's badge flag is set (score 72 or above)
 TOP_CAST_SHOWN = 2  # the printed line stays short, the full cast is in the data
 
 # Filters that are not a user preference (a title already watched cannot be
@@ -55,18 +56,38 @@ def build_result_rows(
     return rows
 
 
-def format_result_lines(rows: List[Dict[str, Any]]) -> List[str]:
-    """The readable list, one line per title, limited to PRINTED_RESULT_COUNT."""
-    lines = []
-    for row in rows[:PRINTED_RESULT_COUNT]:
-        badge = "badge" if row["badge"] == "yes" else "no badge"
-        rating = row["imdb_rating"] if row["imdb_rating"] != "" else "n/a"
-        lines.append(
-            f"{row['rank']:>2}. {row['title']} ({row['year']}) | IMDb {rating} | "
-            f"dir. {row['directors'] or 'n/a'} | cast {row['top_cast'] or 'n/a'} | "
-            f"{row['final_score']} ({badge}) | {row['main_reason']}"
-        )
-    return lines
+class DisplayOptions(NamedTuple):
+    """What to show on screen. The CSV always has the full list."""
+    badged_only: bool = False
+    top: Optional[int] = None
+
+
+def select_rows(rows: List[Dict[str, Any]], options: DisplayOptions) -> List[Dict[str, Any]]:
+    """
+    Pure. The badge filter runs first, then --top, so "--badged-only --top 5"
+    means the best five movies that carry the badge. Rank numbers are kept.
+    """
+    shown = [row for row in rows if row["badge"] == "yes"] if options.badged_only else rows
+    return shown if options.top is None else shown[:options.top]
+
+
+def format_result_table(rows: List[Dict[str, Any]]) -> List[str]:
+    """Every given row as an aligned table: rank, title, year, IMDb, match %, badge, reason."""
+    header = ["Rank", "Title", "Year", "IMDb", "Match", "Badge", "Main reason"]
+    body = [
+        [
+            str(row["rank"]), row["title"], str(row["year"]),
+            str(row["imdb_rating"]) if row["imdb_rating"] != "" else "n/a",
+            f"{row['final_score']:g}%", BADGE_MARK if row["badge"] == "yes" else "",
+            row["main_reason"],
+        ]
+        for row in rows
+    ]
+    widths = [max(len(line[i]) for line in [header] + body) for i in range(len(header) - 1)]
+    return [
+        "  ".join(cell.ljust(width) for cell, width in zip(line, widths)) + "  " + line[-1]
+        for line in [header] + body
+    ]
 
 
 def format_filter_report(
@@ -99,10 +120,14 @@ def _short_list_advice(removed_counts: Dict[str, int], final_count: int) -> str:
     )
 
 
+def safe_file_stem(text: str, fallback: str) -> str:
+    """Text made safe to use in a file name. Shared by the results and persona files."""
+    return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_") or fallback
+
+
 def results_file_name(persona_name: str, today: date) -> str:
     """results/<persona name>_<date>.csv, with anything odd in the name made safe."""
-    safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", persona_name).strip("_") or "persona"
-    return f"{safe_name}_{today.isoformat()}.csv"
+    return f"{safe_file_stem(persona_name, 'persona')}_{today.isoformat()}.csv"
 
 
 def write_results_csv(

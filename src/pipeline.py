@@ -17,6 +17,8 @@ Order of operations:
 Run with:  python -m src.pipeline
 Or for one persona only:  python -m src.pipeline --persona dharun
 Or for your own taste file:  python -m src.pipeline --persona-file personas/example.json
+Or answer questions about your taste:  python -m src.pipeline --interactive
+Both of those also take --badged-only (only movies with the badge) and --top N.
 (this must be run from the project's root folder, not from inside src)
 """
 
@@ -25,14 +27,17 @@ import sys
 from datetime import date, datetime
 
 from src.catalog import load_catalog
+from src.interactive import interview, save_persona_file
 from src.results_report import (
+    DisplayOptions,
     build_result_rows,
     format_filter_report,
-    format_result_lines,
+    format_result_table,
+    select_rows,
     write_results_csv,
 )
 from src.run_warnings import count_missing_movie_data, format_warning_section
-from src.user_profile.persona_loader import load_persona_file
+from src.user_profile.persona_loader import PersonaResult, build_persona_result, load_persona_file
 from src.user_profile.synthetic_users import build_all_personas
 from src.user_profile.taste_score import update_dislike_score, decay_to
 from src.exclusion_filter.exclude import apply_hard_filters
@@ -263,15 +268,15 @@ def print_warning_section(user, catalog, warnings):
         print("\n" + "\n".join(lines))
 
 
-def run_persona_file(path, catalog, context):
+def run_persona_result(result, label, catalog, context, options):
     """
-    Runs the pipeline for a persona file. Returns the exit code: 1 when the
-    file has an error that makes the results meaningless (printed clearly),
-    otherwise 0. Warnings never stop the run, they print once at the end.
+    Runs the pipeline for an already loaded persona. Returns the exit code:
+    1 when the persona has an error that makes the results meaningless
+    (printed clearly), otherwise 0. Warnings never stop the run, they print
+    once at the end. `label` names the source in the error message, like "persona file 'x.json'".
     """
-    result = load_persona_file(path, catalog)
     if result.user is None:
-        print(f"\nCannot run with persona file '{path}':")
+        print(f"\nCannot run with {label}:")
         for error in result.errors:
             print(f"- {error}")
         return 1
@@ -280,10 +285,12 @@ def run_persona_file(path, catalog, context):
     stages = run_pipeline_stages(user, catalog, context)
     warn_if_shortlist_too_small(user, stages["shortlist"])
     rows = build_result_rows(stages["ranked"], catalog)
+    shown = select_rows(rows, options)
 
     print(f"\n=== Recommendations for {user['name']} ===")
     print(f"Taste: {user['taste_summary']}")
-    print("\n".join(format_result_lines(rows)))
+    print(f"Showing {len(shown)} of {len(rows)} ranked titles (badge: score 72 or above)")
+    print("\n".join(format_result_table(shown)))
 
     warnings = list(result.warnings)
     try:
@@ -300,13 +307,69 @@ def run_persona_file(path, catalog, context):
     return 0
 
 
+def run_persona_file(path, catalog, context, options=DisplayOptions()):
+    """Loads the persona file at path and runs it, see run_persona_result."""
+    return run_persona_result(load_persona_file(path, catalog), f"persona file '{path}'", catalog, context, options)
+
+
+def run_interactive(catalog, context, options=DisplayOptions(), ask=input, say=print):
+    """
+    Asks the questions, saves the answers to personas/<name>.json, then runs
+    the engine on them. Answering n at the end (or ending the input) runs
+    nothing and saves nothing. A failed save is a warning: the answers are
+    still in memory, so the run goes ahead from them.
+    """
+    data = interview(ask, say, catalog)
+    if data is None:
+        say("Nothing saved, nothing run.")
+        return 0
+
+    path, save_problem = save_persona_file(data)
+    result = build_persona_result(data, catalog, datetime.now())
+    if save_problem:
+        result = PersonaResult(result.user, result.errors, [save_problem] + result.warnings)
+    else:
+        say(f"Saved your answers to {path}")
+    return run_persona_result(result, "your answers", catalog, context, options)
+
+
+def positive_whole_number(text):
+    """argparse type for --top: a whole number of 1 or more."""
+    try:
+        number = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"'{text}' is not a whole number")
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"--top must be 1 or more, not {number}")
+    return number
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run the recommendation engine on the synthetic personas.")
     parser.add_argument("--persona", help="run only this persona, by first name, for example dharun")
     parser.add_argument(
         "--persona-file", help="run on your own taste file, for example personas/example.json"
     )
+    parser.add_argument(
+        "--interactive", action="store_true",
+        help="answer questions about your taste, they are saved to personas/<name>.json",
+    )
+    parser.add_argument(
+        "--badged-only", action="store_true",
+        help="with --persona-file or --interactive: show only movies with the badge",
+    )
+    parser.add_argument(
+        "--top", type=positive_whole_number,
+        help="with --persona-file or --interactive: show only the first N movies",
+    )
     args = parser.parse_args()
+
+    live = args.interactive or args.persona_file
+    if (args.badged_only or args.top) and not live:
+        parser.error("--badged-only and --top need --persona-file or --interactive")
+    if args.interactive and (args.persona_file or args.persona):
+        parser.error("--interactive cannot be combined with --persona-file or --persona")
+    options = DisplayOptions(badged_only=args.badged_only, top=args.top)
 
     print("Loading MovieLens catalog ...")
     try:
@@ -324,8 +387,10 @@ def main():
         "day_of_week": "Friday",
     }
 
+    if args.interactive:
+        return run_interactive(catalog, context, options)
     if args.persona_file:
-        return run_persona_file(args.persona_file, catalog, context)
+        return run_persona_file(args.persona_file, catalog, context, options)
 
     users = build_all_personas(catalog)
 

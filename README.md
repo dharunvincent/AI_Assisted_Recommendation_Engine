@@ -351,6 +351,27 @@ AI_Assisted_Recommendation_Engine/
 
 No API keys and no paid services are needed to run this project.
 
+## Run it live in 2 minutes
+
+From the project's root folder:
+
+```
+python3 data/download_movielens.py                      # once
+python3 data/download_imdb.py                           # once, optional, adds ratings, directors, cast
+python3 -m src.pipeline --interactive                   # answer the questions
+python3 -m src.pipeline --interactive --top 10          # only the first 10 movies
+python3 -m src.pipeline --persona-file personas/example.json --badged-only
+```
+
+Interactive mode asks one question at a time (name, genres, rating, years,
+directors, cast, favourite movies). Press Enter to skip an optional one. A
+wrong answer is explained and asked again, and a name that is not found
+offers a "did you mean" you accept with `y`. At the end you confirm with
+`y`, your answers are saved to `personas/<name>.json` (not committed to git)
+and the engine runs. Both ways of running show every ranked movie with a
+✓ badge for a score of 72 or above. `--badged-only` shows only those and
+`--top N` shows only the first N. The CSV in `results/` always has them all.
+
 ## Run it with your own taste
 
 You can describe your own taste in a small file and get recommendations
@@ -364,8 +385,8 @@ from it. Steps:
 4. Run it: `python3 -m src.pipeline --persona-file personas/me.json`
 5. Open the CSV it saved in `results/` (the path is printed at the end).
 
-What you get: a readable top 15 (rank, title, year, IMDb rating, director,
-top cast, score, badge, reason), the full list in the CSV, a filter report
+What you get: the full ranked list as a table (rank, title, year, IMDb rating,
+match %, badge, reason), the full list in the CSV, a filter report
 saying how many titles each of your rules removed (and which one to relax
 if the list is short), and a short "Warnings" section.
 
@@ -394,7 +415,8 @@ For someone who does not code. Think of the engine as a funnel.
    genres and ratings. IMDb data (optional) adds a rating, directors and cast.
 2. **Know the person.** A persona is a description of someone's taste: what
    they like, dislike, and a few movies they love. Yours lives in a small
-   JSON file. If you give no favourite movies, a believable history is made
+   JSON file, which you can write by hand or let `--interactive` create by
+   asking you questions. If you give no favourite movies, a believable history is made
    from your liked genres, because the engine needs some history to learn from.
 3. **Find many candidates.** Nine small "finders" each suggest titles from a
    different angle (similar genres, what similar people watched, what is
