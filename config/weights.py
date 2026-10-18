@@ -200,3 +200,12 @@ PERSONA_FILE_HISTORY_SEED = 42
 # -----------------------------------------------------------------------
 SUGGESTION_MATCH_CUTOFF = 0.6
 MAX_SUGGESTIONS = 3
+
+# -----------------------------------------------------------------------
+# IMDB RATING FLOOR MINIMUM VOTES
+# When a persona sets min_imdb_rating, a title only passes if at least this
+# many people voted for it on IMDb. A high rating from a handful of voters
+# cannot be trusted, same idea as MIN_RATINGS_FOR_QUALITY_FLOOR above for the
+# MovieLens floor. A title with no IMDb rating at all is removed too.
+# -----------------------------------------------------------------------
+MIN_IMDB_VOTES_FOR_FLOOR = 1000
