@@ -9,5 +9,6 @@
   "preferred_cast": ["Robert De Niro", "Al Pacino"],
   "avoided_directors": [],
   "avoided_cast": [],
-  "favourite_titles": ["Heat", "The Usual Suspects"]
+  "favourite_titles": ["Heat", "The Usual Suspects"],
+  "never_recommend_titles": ["Star Wars"]
 }

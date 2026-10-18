@@ -26,6 +26,7 @@ from src.user_profile.persona_loader import (
     Catalog,
     clean_genres,
     closest_people,
+    find_blocked_titles,
     find_favourites,
     people_in_catalog,
     read_limits,
@@ -171,6 +172,26 @@ def _ask_titles(ask: Ask, say: Say, prompt: str, catalog: Catalog) -> List[str]:
     return kept
 
 
+def _ask_blocked_titles(ask: Ask, say: Say, prompt: str, catalog: Catalog) -> List[str]:
+    """
+    Titles to never recommend. A name that blocks something is kept as typed,
+    one that matches nothing gets a single "did you mean" the user can accept.
+    """
+    by_title = titles_by_name(catalog)
+    kept: List[str] = []
+    for title in split_answer(ask(prompt)):
+        blocked_ids, _ = find_blocked_titles([title], catalog)
+        if blocked_ids:
+            kept.append(title)
+            continue
+        suggestions = suggest_titles(title, by_title)
+        if suggestions and _confirm(ask, say, f"  '{title}' was not found. Did you mean {suggestions[0]}? (y/n) "):
+            kept.append(suggestions[0])
+        else:
+            say(f"  Skipped '{title}'.")
+    return kept
+
+
 def _ask_limits(ask: Ask, say: Say, imdb_ready: bool) -> Dict[str, Optional[float]]:
     """Rating, year from, year to. The rating needs IMDb data, so it is skipped without it."""
     limits: Dict[str, Optional[float]] = {"min_imdb_rating": None, "year_from": None, "year_to": None}
@@ -222,10 +243,14 @@ def interview(ask: Ask, say: Say, catalog: Catalog, confirm: bool = True) -> Opt
         else:
             say("IMDb data is not downloaded, skipping the director and cast questions.")
         favourites = _ask_titles(ask, say, "Your favourite movies (Enter to skip): ", catalog)
+        blocked = _ask_blocked_titles(
+            ask, say, "Titles to never recommend, a name blocks every title containing it, "
+            "like Star Wars (Enter to skip): ", catalog,
+        )
 
         data = {
             "name": name, "liked_genres": liked, "disliked_genres": disliked, **limits, **people,
-            "favourite_titles": favourites,
+            "favourite_titles": favourites, "never_recommend_titles": blocked,
         }
         if not confirm:
             return data
