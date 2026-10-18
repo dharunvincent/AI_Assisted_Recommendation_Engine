@@ -175,6 +175,16 @@ CONTEXT_BIAS_DEFAULT = 0.45
 OVERRIDE_BIAS_STRONG_FIT = 0.7
 OVERRIDE_BIAS_WEAK_FIT = 0.1
 OVERRIDE_MIN_GENRE_OVERLAP = 2
+# Sharing liked genres is not enough to beat a dislike: nearly every popular
+# title shares two, which let an ordinary crowd pleaser like Toy Story (3.92)
+# overrule the animation dislike. The strong override chance also needs a
+# standout average rating. 4.2 of 5 was chosen from the catalog: among the
+# 1297 titles with at least MIN_RATINGS_FOR_QUALITY_FLOOR ratings, 39 (3 percent)
+# reach 4.2, the real classics. Counting titles with any number of ratings,
+# 972 reach it, but nearly all of those are averages of a handful of raters, so
+# the title must also have the minimum rating count. A guess to be tuned on real
+# data, like the other numbers here.
+OVERRIDE_STANDOUT_RATING = 4.2
 
 # -----------------------------------------------------------------------
 # STAGE 1 GENERATOR CUT OFFS

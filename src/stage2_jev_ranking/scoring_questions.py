@@ -32,6 +32,8 @@ from config.weights import (
     OVERRIDE_BIAS_STRONG_FIT,
     OVERRIDE_BIAS_WEAK_FIT,
     OVERRIDE_MIN_GENRE_OVERLAP,
+    OVERRIDE_STANDOUT_RATING,
+    MIN_RATINGS_FOR_QUALITY_FLOOR,
 )
 
 
@@ -83,6 +85,22 @@ def taste_bias(genre_overlap_count, preferred_people_count=0):
     )
 
 
+def is_strong_override_fit(movie, genre_overlap_count):
+    """
+    Pure. True only for a title that shares enough liked genres AND is a
+    standout by rating, so overriding a genre dislike stays occasional.
+    A title with no rating, or too few ratings to trust the average, never
+    counts as a standout.
+    """
+    rating = movie["avg_rating"]
+    return (
+        genre_overlap_count >= OVERRIDE_MIN_GENRE_OVERLAP
+        and rating is not None
+        and rating >= OVERRIDE_STANDOUT_RATING
+        and movie.get("rating_count", 0) >= MIN_RATINGS_FOR_QUALITY_FLOOR
+    )
+
+
 def build_questions(
     movie, candidate, dislike_penalty, genre_overlap_count, preferred_people_count=0
 ):
@@ -131,7 +149,7 @@ def build_questions(
             options=["override_show_anyway", "keep_penalty"],
             bias_hint=(
                 OVERRIDE_BIAS_STRONG_FIT
-                if genre_overlap_count >= OVERRIDE_MIN_GENRE_OVERLAP and dislike_penalty > 0
+                if dislike_penalty > 0 and is_strong_override_fit(movie, genre_overlap_count)
                 else OVERRIDE_BIAS_WEAK_FIT
             ),
         ),
