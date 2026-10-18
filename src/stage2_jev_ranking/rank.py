@@ -160,7 +160,7 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
                 "taste_fit_before_penalty": taste_fit_before_penalty,
                 "taste_fit_after_penalty": taste_fit_score,
                 "taste_bias_before_cap": scoring_questions.taste_bias(
-                    genre_overlap_count, len(preferred_people)
+                    genre_overlap_count, len(preferred_people), candidate.get("collab_strength", 0.0)
                 ),
             },
         })

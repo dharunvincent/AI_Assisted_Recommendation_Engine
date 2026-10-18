@@ -171,6 +171,15 @@ TASTE_BIAS_PER_GENRE_OVERLAP = 0.12
 # 4.5 free points to 15 popular titles for every user. Now the title decides.
 CONTEXT_BIAS_MATCHES_BUCKET = 0.75
 CONTEXT_BIAS_DEFAULT = 0.45
+# Collaborative filtering says HOW STRONGLY other viewers link a title to the
+# user's liked ones (collab_strength, 0 to 1, the best match of that user's list
+# being 1). Stage 2 used to ignore it, so a title picked by a strong crowd match
+# ranked like any other. The boost is strength x COLLAB_TASTE_BIAS_MAX, and the
+# maximum equals one shared genre (TASTE_BIAS_PER_GENRE_OVERLAP, 0.12): crowd
+# evidence is a hint at the same weight as one liked genre, never a verdict.
+# COLLAB_STRENGTH_CAP stops a bad strength value from breaking that limit.
+COLLAB_TASTE_BIAS_MAX = 0.12
+COLLAB_STRENGTH_CAP = 1.0
 # Expected answer to the override question: strong when the title shares at
 # least OVERRIDE_MIN_GENRE_OVERLAP liked genres and a penalty is active,
 # weak otherwise.

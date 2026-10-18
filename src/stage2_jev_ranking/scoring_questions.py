@@ -30,6 +30,8 @@ from config.weights import (
     TASTE_BIAS_PEOPLE_CAP,
     CONTEXT_BIAS_MATCHES_BUCKET,
     CONTEXT_BIAS_DEFAULT,
+    COLLAB_TASTE_BIAS_MAX,
+    COLLAB_STRENGTH_CAP,
     OVERRIDE_BIAS_STRONG_FIT,
     OVERRIDE_BIAS_WEAK_FIT,
     OVERRIDE_MIN_GENRE_OVERLAP,
@@ -73,7 +75,15 @@ def people_taste_boost(preferred_people_count):
     return min(preferred_people_count * TASTE_BIAS_PER_PREFERRED_PERSON, TASTE_BIAS_PEOPLE_CAP)
 
 
-def taste_bias(genre_overlap_count, preferred_people_count=0):
+def collab_taste_boost(collab_strength):
+    """
+    Pure. The extra expected taste fit for a strong collaborative match:
+    strength (0 to 1) times COLLAB_TASTE_BIAS_MAX, never more than that.
+    """
+    return min(max(collab_strength, 0.0), COLLAB_STRENGTH_CAP) * COLLAB_TASTE_BIAS_MAX
+
+
+def taste_bias(genre_overlap_count, preferred_people_count=0, collab_strength=0.0):
     """
     The expected taste fit BEFORE the mock clamps it to 0..1. A value above
     1.0 means the mock cannot tell the title apart from a perfect fit, so
@@ -83,6 +93,7 @@ def taste_bias(genre_overlap_count, preferred_people_count=0):
         TASTE_BIAS_BASE
         + (genre_overlap_count * TASTE_BIAS_PER_GENRE_OVERLAP)
         + people_taste_boost(preferred_people_count)
+        + collab_taste_boost(collab_strength)
     )
 
 
@@ -124,7 +135,9 @@ def build_questions(
     # deliberately NOT part of this number. It is applied exactly once,
     # in rank.py, so that the override logic can soften it cleanly. If it
     # was also subtracted here, the override could never fully work.
-    expected_taste = taste_bias(genre_overlap_count, preferred_people_count)
+    expected_taste = taste_bias(
+        genre_overlap_count, preferred_people_count, candidate.get("collab_strength", 0.0)
+    )
 
     # Rough expectation for completion likelihood, a well regarded movie
     # in the real MovieLens data is a reasonable proxy for "most people
