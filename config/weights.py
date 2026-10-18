@@ -155,6 +155,10 @@ OVERRIDE_MIN_GENRE_OVERLAP = 2
 COLLAB_HIGH_RATING_THRESHOLD = 4.0
 # Diversity injection only offers titles rated at least this well.
 DIVERSITY_MIN_AVG_RATING = 3.8
+# Diversity injection also needs this many ratings behind the average. Same
+# reason as MIN_RATINGS_FOR_QUALITY_FLOOR: an average of 4.5 from two raters
+# is luck, not quality, and a random pick would otherwise surface such titles.
+DIVERSITY_MIN_RATINGS = 20
 
 # -----------------------------------------------------------------------
 # BUSINESS WEIGHT: PROMOTION IS A SMALL NUDGE
