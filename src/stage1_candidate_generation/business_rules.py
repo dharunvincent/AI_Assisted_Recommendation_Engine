@@ -48,6 +48,19 @@ def validate_promoted_content(promoted_content):
 validate_promoted_content(PROMOTED_CONTENT)
 
 
+def business_weight_for_user(business_weight, user, movie):
+    """
+    Pure. The promotion weight this user is allowed to be nudged by.
+    Rule: a promotion never pushes a genre the user declared they dislike,
+    so a promoted title carrying one of their disliked_genres gets the
+    neutral weight (0). Dislikes learned from watch history do not count
+    here, only the ones the user stated.
+    """
+    if set(user.get("disliked_genres", [])).intersection(movie["genres"]):
+        return BUSINESS_WEIGHT_NEUTRAL
+    return business_weight
+
+
 def generate(user, catalog, max_candidates=10):
     watched_ids = {entry["movie_id"] for entry in user["watch_history"]}
 

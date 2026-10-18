@@ -19,6 +19,7 @@ architecture, not a measured result from a real trained model.
 """
 
 from src.stage2_jev_ranking import jev_client, scoring_questions
+from src.stage1_candidate_generation.business_rules import business_weight_for_user
 from src.user_profile.people_match import matched_preferred_people
 from config.weights import (
     TASTE_FIT_WEIGHT,
@@ -122,7 +123,10 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
         context_score = jev_answers["context_fit"]["answer"]
         # A title nobody promoted has no business weight and adds nothing.
         # Promotion is a small nudge, worth at most 7.5 extra points.
-        business_score = candidate.get("business_weight", BUSINESS_WEIGHT_NEUTRAL)
+        # Promotion is switched off for a genre the user declared they dislike.
+        business_score = business_weight_for_user(
+            candidate.get("business_weight", BUSINESS_WEIGHT_NEUTRAL), user, movie
+        )
 
         final_score = (
             taste_fit_score * TASTE_FIT_WEIGHT

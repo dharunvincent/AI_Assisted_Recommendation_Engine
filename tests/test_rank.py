@@ -139,6 +139,24 @@ class TestBusinessWeight(unittest.TestCase):
         result = rank_one(fixed_answers(), dislike_scores={}, business_weight=0.4)
         self.assertEqual(result["final_score"], expected_final_score(TASTE, business=0.4))
 
+    def test_promotion_is_ignored_for_a_declared_disliked_genre(self):
+        user = {**USER, "disliked_genres": ["Horror"]}
+        with patch(ASK, return_value=fixed_answers()):
+            result = rank_candidates(user, tiny_catalog(), [candidate(1, business_weight=0.4)], CONTEXT_INFO, {})[0]
+        self.assertEqual(result["final_score"], expected_final_score(TASTE, business=BUSINESS_WEIGHT_NEUTRAL))
+
+    def test_promotion_still_counts_when_the_dislike_is_a_different_genre(self):
+        user = {**USER, "disliked_genres": ["Comedy"]}
+        with patch(ASK, return_value=fixed_answers()):
+            result = rank_candidates(user, tiny_catalog(), [candidate(1, business_weight=0.4)], CONTEXT_INFO, {})[0]
+        self.assertEqual(result["final_score"], expected_final_score(TASTE, business=0.4))
+
+    def test_dislike_found_only_in_watch_history_does_not_switch_promotion_off(self):
+        # Only the declared list counts, a learned dislike score alone does not.
+        result = rank_one(fixed_answers(), dislike_scores={"Horror": 1.0}, business_weight=0.4)
+        self.assertEqual(result["final_score"], expected_final_score(
+            TASTE - DISLIKE_PENALTY_SCALE, business=0.4))
+
 
 class TestMatchPercent(unittest.TestCase):
     def test_match_percent_is_the_taste_completion_blend(self):
