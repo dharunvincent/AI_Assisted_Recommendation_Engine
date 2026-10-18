@@ -107,18 +107,21 @@ Each generator lives in its own file inside `src/stage1_candidate_generation/`
    divides the number of shared fans by the square root of the two
    movies' fan counts, so a blockbuster that everybody liked no longer
    wins for every user just because it shares fans with everything. Pairs
-   with fewer than 3 shared fans are ignored as noise.
+   with fewer than 3 shared fans are ignored as noise, and a linked title
+   still needs at least 20 ratings of its own to be offered.
 
 3. **Demographic filtering** (`demographic.py`) Recommends titles that
    tend to suit the user's age group, useful mainly for new users with
-   little or no history yet.
+   little or no history yet. Only titles with at least 20 ratings are
+   considered (it used to sort by average rating alone, which put a film
+   with one 5.0 rating at the top).
 
 4. **Popularity and trending** (`trending.py`) In a real platform this
    would pull trending data from outside services like JustWatch or
    TMDB, not just from the platform's own numbers. This project has no
    live internet connection for that, so it uses how many real ratings a
    title received in the MovieLens dataset as a simple stand in for
-   popularity.
+   popularity. Only titles with at least 20 ratings count.
 
 5. **Context aware filtering** (`context_aware.py`) Looks at the
    situation right now, time of day and day of week, and leans the
@@ -130,7 +133,9 @@ Each generator lives in its own file inside `src/stage1_candidate_generation/`
 
 6. **Session based filtering** (`session_based.py`) Looks only at what
    the user just watched in this current sitting, and reacts to that
-   immediately, separate from their long term taste profile.
+   immediately, separate from their long term taste profile. It lists
+   the best known matching titles first and skips titles with fewer than 20
+   ratings (it used to take the first matches in catalog file order).
 
 7. **Business rules based promotion** (`business_rules.py`) Some titles
    get pushed by the platform itself for business reasons, not because
@@ -150,6 +155,13 @@ Each generator lives in its own file inside `src/stage1_candidate_generation/`
    with your own taste"). It finds unwatched titles with one of those
    people, best known first, with a reason like "directed by Michael
    Mann". For the four built in personas it returns nothing.
+
+Every generator that picks titles from the catalog (all of them except business
+rules, which is a hand picked list, and the preferred people generator, which
+follows people the user named) starts from ONE shared list in
+`src/catalog_pools.py`: titles with at least `MIN_RATINGS_TO_TRUST` (20)
+ratings, best known first. Each generator only adds its own rule on top, so
+there is no second copy of the rating count rule to forget.
 
 All nine are designed to run in parallel in a real platform, and run one
 after another in this project, because threads give no speed up for pure
@@ -280,10 +292,10 @@ The badge (a small "91% match" label on the tile) is shown when the match %
 is 85 or higher (`BADGE_DISPLAY_THRESHOLD_PERCENT`). 85 was chosen after looking at 228 titles across the four
 built in personas and one saved persona: it badges about 1 in 5 titles
 (18 percent), while the old cut off of 72 would have badged 54 percent of
-them. That 1 in 5 was measured before round three. After it, 34 of the 60
-titles in the four built in top 15 lists carry the badge (57 percent), because the
-dislike penalty is capped and context fit now lifts every title that suits the
-moment. The cut off was not changed, it is a locked decision. Titles below 85 still get recommended and shown normally, they just do
+them. That 1 in 5 was measured long ago. Today 33 of the 60 titles in the
+four built in top 15 lists carry the badge (55 percent), because the dislike
+penalty is capped and context fit now lifts every title that suits the
+moment. It is not evenly spread: Dharun's list has 14 badges and Arjun's has 2. The cut off was not changed, it is a locked decision. Titles below 85 still get recommended and shown normally, they just do
 not carry the badge. The threshold never changes the ranking order. For titles without a badge, the tile
 can fall back to a plain tag such as "trending now" if one naturally
 applies, or just show the plain title with nothing extra, never a made
@@ -476,16 +488,15 @@ produced by the mock scorer, not a trained model.
 
 | Persona | Top result | Match | Titles with the badge (match 85 or above, top 15) |
 |---|---|---|---|
-| Arjun | The Raid: Redemption (2011) | 96.7% | 4 |
-| Meera | What Happened Was... (1994) | 100.0% | 10 |
-| Thomas | Inception (2010) | 98.6% | 6 |
-| Dharun | Star Wars: Episode V - The Empire Strikes Back (1980) | 94.7% | 14 |
+| Arjun | Fight Club (1999) | 89.7% | 2 |
+| Meera | Fight Club (1999) | 98.0% | 11 |
+| Thomas | Inception (2010) | 98.1% | 6 |
+| Dharun | Star Wars: Episode V - The Empire Strikes Back (1980) | 94.3% | 14 |
 
-The percentage is the match %, not the ranking score. Meera's top pick is a
-100.0% match (What Happened Was..., 1994), a title with a single rating. **A 100% match is not a
-real perfect fit.** Taste and completion are both answered by the mock
-scorer, whose random wobble can push both to the top, so 100% means the
-wobble was lucky, nothing more. These numbers are higher than the tables
+The percentage is the match %, not the ranking score. **A match near 100% is
+not a real perfect fit.** Taste and completion are both answered by the mock
+scorer, whose random wobble can push both to the top, so a very high match
+means the wobble was lucky, nothing more. These numbers are higher than the tables
 older versions of this README showed because they are a different measure
 (see "The match percentage badge"). Do not compare them with the old 72.8%
 and 76.0%, those were ranking scores.
@@ -701,11 +712,47 @@ Before and after for every number and each persona's top 15 are saved in
 comes from the mock scorer.** The evaluation measures the mock's rules, not a
 trained JEV model.
 
-An honest finding from the comparison: Meera's top pick is a title with one
-rating (average 5.0), and three other single rating titles sit in her top 15.
-This is not new, the same title was already 3rd before round three. The mock
-trusts a perfect average from one rater, because completion is guessed from the
-average rating. Round three did not touch this and it is the next thing worth fixing.
+## Round four: single rating titles
+
+Meera's number 1 pick was "What Happened Was..." at a 100 percent match, and
+only one person ever rated it. Supercop 2 and The Assignment, also rated by one
+person each, sat in the lists of Arjun, Meera and Thomas. There were two root
+causes, and both are fixed:
+
+1. **Generators trusted any average.** Demographic filtering sorted titles by
+   average rating alone, with no minimum number of ratings, so one 5.0 put a
+   film at the top. Session based filtering took the first matches in file
+   order, and collaborative filtering needs only 3 shared fans. Now ONE shared
+   list (`src/catalog_pools.py`) gives every catalog generator only titles with
+   at least `MIN_RATINGS_TO_TRUST` (20) ratings, best known first. The three
+   separate copies of "20" (quality floor, content based, diversity) became that
+   one constant.
+2. **Stage 2 trusted tiny averages.** Completion likelihood was guessed as the
+   average rating divided by 5, so one 5.0 gave a perfect 1.000. The average is
+   now pulled toward the catalog wide average (3.50) first, like adding 20
+   imaginary raters who all gave the catalog average
+   (`RATING_SHRINKAGE_STRENGTH = 20`). A title with one 5.0 rating now gets
+   0.715 instead of 1.000, and Shawshank Redemption (4.43 from 317 raters)
+   barely moves, 0.886 to 0.875.
+
+What changed in the results (mock scorer, `evaluation_snapshots/comparison.md`):
+- The three single rating titles are gone from every persona's list. All 183
+  ranked titles across the four built in personas have at least 20 ratings.
+- The evaluation did not move: hit rate 19.0 percent, recall 4.4 percent, the
+  same diagnosis numbers (one title more or less on the shortlist). This is
+  expected. The 100 test users get big shortlists built from real histories,
+  and none of the 500 hidden answers was a thinly rated title, so this fix
+  cleans up recommendations for the personas without changing the score. It
+  is not a measured improvement in recommendation quality.
+- A cost: Arjun's old number 1, The Raid: Redemption (2011), has only 9
+  MovieLens ratings, so it is gone too. It is a well liked film, and the
+  small MovieLens sample is why it does not clear the bar. A rule based on
+  rating count cannot tell a hidden gem from a fluke.
+- Preferred directors and cast (persona files) are not filtered by rating
+  count, because the user named those people. Promoted titles are not either,
+  that list is hand picked.
+
+**Every number in this README still comes from the mock scorer.**
 
 ## Changes after code review
 
