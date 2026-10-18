@@ -22,7 +22,7 @@ CSV_COLUMNS = [
     "rank", "title", "year", "imdb_rating", "directors", "top_cast",
     "match_percent", "final_score", "badge", "main_reason", "all_reasons",
 ]
-BADGE_MARK = "✓"  # shown when the engine's badge flag is set (score 72 or above)
+BADGE_MARK = "✓"  # shown when the engine's badge flag is set (match 85 percent or above)
 TOP_CAST_SHOWN = 2  # the printed line stays short, the full cast is in the data
 
 # Filters that are not a user preference (a title already watched cannot be

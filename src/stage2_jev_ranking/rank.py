@@ -9,8 +9,9 @@ movie in the shortlist it does the following:
 3. resolves the dislike override logic
 4. combines everything into one final score out of 100 using the
    weights locked in during planning (config/weights.py)
-5. decides whether the score badge should be shown, using the 72
-   percent threshold, without changing the ranking order itself
+5. works out the match percent shown to the user and decides whether the
+   badge is shown, using the 85 percent threshold on the match percent,
+   without changing the ranking order itself (that uses the final score)
 
 Remember, every JEV flavoured number here comes from a mock client. The
 final scores and the order of this list are a demonstration of the
@@ -128,6 +129,8 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
 
         final_score = round(final_score, 1)
 
+        match_percent = match_percent_for(taste_fit_score, completion_score)
+
         ranked.append({
             "movie_id": movie["movie_id"],
             "title": movie["title"],
@@ -137,8 +140,8 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
             "sources": candidate["sources"],
             "reasons": candidate["reasons"],
             "final_score": final_score,
-            "match_percent": match_percent_for(taste_fit_score, completion_score),
-            "show_badge": final_score >= BADGE_DISPLAY_THRESHOLD_PERCENT,
+            "match_percent": match_percent,
+            "show_badge": match_percent >= BADGE_DISPLAY_THRESHOLD_PERCENT,
             "dislike_override_used": override_used,
             "jev_answers": jev_answers,
             # Read only numbers for src/evaluate.py --diagnose. Nothing in

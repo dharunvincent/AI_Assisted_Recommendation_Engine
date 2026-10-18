@@ -217,7 +217,7 @@ def print_results(user, ranked):
     print(f"Persona taste: {user['taste_summary']}")
 
     for item in ranked[:15]:
-        badge = f"{item['final_score']}% match" if item["show_badge"] else "no badge, below 72%"
+        badge = f"{item['match_percent']}% match" if item["show_badge"] else f"no badge, {item['match_percent']}% match, below 85%"
         override_note = " [dislike override used]" if item["dislike_override_used"] else ""
         top_reason = item["reasons"][0]
         # Only show the average rating for users who set a quality floor,
@@ -289,7 +289,7 @@ def run_persona_result(result, label, catalog, context, options):
 
     print(f"\n=== Recommendations for {user['name']} ===")
     print(f"Taste: {user['taste_summary']}")
-    print(f"Showing {len(shown)} of {len(rows)} ranked titles (badge: score 72 or above)")
+    print(f"Showing {len(shown)} of {len(rows)} ranked titles (badge: match 85 percent or above)")
     print("\n".join(format_result_table(shown)))
 
     warnings = list(result.warnings)

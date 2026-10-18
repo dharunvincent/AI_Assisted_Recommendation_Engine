@@ -54,7 +54,7 @@ assert abs(
 # interface. Below this number, the content can still be recommended
 # and shown, it just will not carry a score badge on it.
 # -----------------------------------------------------------------------
-BADGE_DISPLAY_THRESHOLD_PERCENT = 72
+BADGE_DISPLAY_THRESHOLD_PERCENT = 85
 
 # -----------------------------------------------------------------------
 # DISLIKE SIGNAL BASE WEIGHTS
@@ -83,7 +83,7 @@ SIGNAL_HALF_LIFE_DAYS = 60
 # -----------------------------------------------------------------------
 # STAGE 1 SHORTLIST SIZE
 # How many candidates stage 1 hands over to stage 2 after merging and
-# removing duplicates from the output of all eight generators.
+# removing duplicates from the output of all nine generators.
 # -----------------------------------------------------------------------
 STAGE1_SHORTLIST_MIN_SIZE = 30
 STAGE1_SHORTLIST_MAX_SIZE = 50

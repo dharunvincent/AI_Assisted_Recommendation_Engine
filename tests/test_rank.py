@@ -162,6 +162,19 @@ class TestBadgeAndOrder(unittest.TestCase):
         self.assertTrue(badge_by_title["Horror One"])    # exactly on the line gets the badge
         self.assertFalse(badge_by_title["Comedy Two"])   # just below does not
 
+    def test_badge_follows_match_percent_not_the_promoted_final_score(self):
+        # Same fit to the person; only one title is promoted. Promotion lifts
+        # its final score but must not decide the badge.
+        threshold = BADGE_DISPLAY_THRESHOLD_PERCENT / 100
+        answers = fixed_answers(taste=threshold, completion=threshold, context=0.0)
+        plain = rank_one(answers, dislike_scores={})
+        promoted = rank_one(answers, dislike_scores={}, business_weight=0.5)
+        self.assertTrue(plain["show_badge"])
+        self.assertTrue(promoted["show_badge"])
+        below = rank_one(fixed_answers(taste=threshold - 0.05, completion=threshold - 0.05, context=1.0),
+                         dislike_scores={}, business_weight=0.5)
+        self.assertFalse(below["show_badge"])  # a high final score cannot buy the badge
+
     def test_list_is_ordered_by_final_score_only(self):
         # The lower scoring title comes first in the shortlist on purpose.
         ranked = self.rank_with_uniform_scores({"Horror One": 0.5, "Comedy Two": 0.9})
