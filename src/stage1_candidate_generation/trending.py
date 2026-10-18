@@ -15,15 +15,15 @@ and cared enough to rate this". This is a simulation, not a real
 trending signal, and it is clearly labeled as such.
 """
 
+from src.catalog_pools import trusted_titles
+
 
 def generate(user, catalog, max_candidates=15):
     watched_ids = {entry["movie_id"] for entry in user["watch_history"]}
 
-    popular_movies = [
-        movie for movie in catalog.values()
-        if movie["movie_id"] not in watched_ids and movie["rating_count"] > 0
-    ]
-    popular_movies.sort(key=lambda movie: movie["rating_count"], reverse=True)
+    # The shared list is already ordered by number of ratings, which is the
+    # stand in for "trending" here.
+    popular_movies = trusted_titles(catalog, watched_ids)
 
     candidates = []
     for movie in popular_movies[:max_candidates]:

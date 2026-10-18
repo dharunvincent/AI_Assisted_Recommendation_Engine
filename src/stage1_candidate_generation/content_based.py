@@ -28,7 +28,8 @@ filled by taking one title from each list in turn.
 
 from collections import Counter
 
-from config.weights import MIN_RATINGS_FOR_CONTENT_BASED, LIKED_COMPLETION_THRESHOLD
+from config.weights import LIKED_COMPLETION_THRESHOLD
+from src.catalog_pools import trusted_titles
 
 
 def generate(user, catalog, max_candidates=15):
@@ -86,16 +87,10 @@ def _pick_spread_across_genres(preferred_genres, watched_ids, catalog, max_candi
 def _best_known_titles_in_genre(genre, watched_ids, catalog):
     """
     Unwatched titles in this genre with enough ratings to trust, most
-    rated first, with the higher average rating winning ties.
+    rated first, with the higher average rating winning ties (the shared
+    helper's order).
     """
-    titles = [
-        movie for movie in catalog.values()
-        if genre in movie["genres"]
-        and movie["movie_id"] not in watched_ids
-        and movie["rating_count"] >= MIN_RATINGS_FOR_CONTENT_BASED
-    ]
-    titles.sort(key=lambda movie: (movie["rating_count"], movie["avg_rating"]), reverse=True)
-    return titles
+    return [movie for movie in trusted_titles(catalog, watched_ids) if genre in movie["genres"]]
 
 
 def _pick_by_inferred_genres(user, watched_ids, catalog, max_candidates):
@@ -122,11 +117,7 @@ def _pick_by_inferred_genres(user, watched_ids, catalog, max_candidates):
     # favourite genres the title really has (counted here, not read back
     # from the reason text), then by how well known, then by average rating.
     ranked = []
-    for movie in catalog.values():
-        if movie["movie_id"] in watched_ids:
-            continue
-        if movie["rating_count"] < MIN_RATINGS_FOR_CONTENT_BASED:
-            continue
+    for movie in trusted_titles(catalog, watched_ids):
         overlap = favourite_genres.intersection(movie["genres"])
         if overlap:
             ranked.append((len(overlap), movie["rating_count"], movie["avg_rating"], movie, overlap))

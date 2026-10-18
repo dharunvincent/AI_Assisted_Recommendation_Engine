@@ -14,6 +14,8 @@ looks at everything a user has ever liked. Session based filtering only
 looks at what they just did, right now, in this one sitting.
 """
 
+from src.catalog_pools import trusted_titles
+
 
 def generate(user, catalog, max_candidates=10):
     session_movie_ids = user.get("current_session", [])
@@ -32,9 +34,9 @@ def generate(user, catalog, max_candidates=10):
         return []
 
     candidates = []
-    for movie in catalog.values():
-        if movie["movie_id"] in watched_ids or movie["movie_id"] in session_movie_ids:
-            continue
+    # Best known titles first, and none without enough ratings. It used to
+    # take the first matches in catalog file order.
+    for movie in trusted_titles(catalog, watched_ids | set(session_movie_ids)):
         if session_genres.intersection(movie["genres"]):
             candidates.append({
                 "movie_id": movie["movie_id"],

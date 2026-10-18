@@ -14,14 +14,14 @@ from config.weights import (
     OVERRIDE_BIAS_WEAK_FIT,
     OVERRIDE_MIN_GENRE_OVERLAP,
     OVERRIDE_STANDOUT_RATING,
-    MIN_RATINGS_FOR_QUALITY_FLOOR,
+    MIN_RATINGS_TO_TRUST,
     CONTEXT_BIAS_MATCHES_BUCKET,
     CONTEXT_BIAS_DEFAULT,
 )
 from src.stage1_candidate_generation.context_aware import genres_for_context
 from src.stage2_jev_ranking.scoring_questions import build_questions, context_taste_bias, is_strong_override_fit
 
-ENOUGH = MIN_RATINGS_FOR_QUALITY_FLOOR
+ENOUGH = MIN_RATINGS_TO_TRUST
 CONTEXT = {"time_of_day": "evening", "day_of_week": "Friday"}  # weekend evening bucket
 
 

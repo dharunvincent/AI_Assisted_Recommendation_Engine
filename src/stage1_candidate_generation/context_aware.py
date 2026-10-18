@@ -17,7 +17,7 @@ left out of this project, it was flagged during planning as extra scope
 not needed to prove the architecture works.
 """
 
-from config.weights import MIN_RATINGS_FOR_CONTENT_BASED
+from src.catalog_pools import trusted_titles
 
 CONTEXT_GENRE_RULES = {
     "weekday_daytime": ["Comedy", "Animation", "Documentary"],
@@ -54,16 +54,13 @@ def generate(user, catalog, context, max_candidates=15):
     if not preferred_genres:
         return []
 
-    # Without a rating floor and a sort, this took the first matching titles
-    # in catalog file order, which is how random 1995 films filled the list.
-    # Now the best known titles come first, the higher average winning ties.
+    # Best known titles come first (the shared helper's order), and titles
+    # without enough ratings are left out, so the list is not filled with
+    # random obscure films in catalog file order.
     matching = [
-        movie for movie in catalog.values()
-        if movie["movie_id"] not in watched_ids
-        and movie["rating_count"] >= MIN_RATINGS_FOR_CONTENT_BASED
-        and set(preferred_genres).intersection(movie["genres"])
+        movie for movie in trusted_titles(catalog, watched_ids)
+        if set(preferred_genres).intersection(movie["genres"])
     ]
-    matching.sort(key=lambda movie: (movie["rating_count"], movie["avg_rating"]), reverse=True)
 
     return [
         {

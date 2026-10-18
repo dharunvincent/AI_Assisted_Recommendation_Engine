@@ -36,7 +36,7 @@ from config.weights import (
     OVERRIDE_BIAS_WEAK_FIT,
     OVERRIDE_MIN_GENRE_OVERLAP,
     OVERRIDE_STANDOUT_RATING,
-    MIN_RATINGS_FOR_QUALITY_FLOOR,
+    MIN_RATINGS_TO_TRUST,
 )
 
 
@@ -109,7 +109,7 @@ def is_strong_override_fit(movie, genre_overlap_count):
         genre_overlap_count >= OVERRIDE_MIN_GENRE_OVERLAP
         and rating is not None
         and rating >= OVERRIDE_STANDOUT_RATING
-        and movie.get("rating_count", 0) >= MIN_RATINGS_FOR_QUALITY_FLOOR
+        and movie.get("rating_count", 0) >= MIN_RATINGS_TO_TRUST
     )
 
 

@@ -17,7 +17,8 @@ over the recommendations.
 
 import random
 
-from config.weights import DIVERSITY_MIN_AVG_RATING, DIVERSITY_MIN_RATINGS
+from config.weights import DIVERSITY_MIN_AVG_RATING
+from src.catalog_pools import trusted_titles
 
 
 def generate(user, catalog, max_candidates=5, random_seed=None):
@@ -35,11 +36,8 @@ def generate(user, catalog, max_candidates=5, random_seed=None):
             watched_genres.update(movie["genres"])
 
     unexplored_candidates = [
-        movie for movie in catalog.values()
-        if movie["movie_id"] not in watched_ids
-        and movie["avg_rating"] is not None
-        and movie["avg_rating"] >= DIVERSITY_MIN_AVG_RATING
-        and movie["rating_count"] >= DIVERSITY_MIN_RATINGS
+        movie for movie in trusted_titles(catalog, watched_ids)
+        if movie["avg_rating"] >= DIVERSITY_MIN_AVG_RATING
         and not set(movie["genres"]).intersection(watched_genres)
     ]
 
