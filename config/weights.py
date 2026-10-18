@@ -56,6 +56,10 @@ assert abs(
 # -----------------------------------------------------------------------
 BADGE_DISPLAY_THRESHOLD_PERCENT = 85
 
+# How many ranked titles the built in persona printout shows, and how many of
+# them the dislike check looks at. Kept here so the two cannot drift apart.
+PRINTED_TOP_COUNT = 15
+
 # -----------------------------------------------------------------------
 # DISLIKE SIGNAL BASE WEIGHTS
 # These feed the taste score decay formula in src/user_profile/taste_score.py

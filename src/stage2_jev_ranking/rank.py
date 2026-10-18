@@ -10,7 +10,7 @@ movie in the shortlist it does the following:
 4. combines everything into one final score out of 100 using the
    weights locked in during planning (config/weights.py)
 5. works out the match percent shown to the user and decides whether the
-   badge is shown, using the 85 percent threshold on the match percent,
+   badge is shown, using BADGE_DISPLAY_THRESHOLD_PERCENT on the match percent,
    without changing the ranking order itself (that uses the final score)
 
 Remember, every JEV flavoured number here comes from a mock client. The

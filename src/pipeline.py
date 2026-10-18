@@ -59,6 +59,8 @@ from config.weights import (
     STAGE1_SHORTLIST_MIN_SIZE,
     STAGE1_SHORTLIST_MAX_SIZE,
     DISLIKE_SIGNAL_MAX_COMPLETION,
+    BADGE_DISPLAY_THRESHOLD_PERCENT,
+    PRINTED_TOP_COUNT,
 )
 
 
@@ -216,8 +218,10 @@ def print_results(user, ranked):
     print(f"\n=== Recommendations for {user['name']} ({user['user_id']}) ===")
     print(f"Persona taste: {user['taste_summary']}")
 
-    for item in ranked[:15]:
-        badge = f"{item['match_percent']}% match" if item["show_badge"] else f"no badge, {item['match_percent']}% match, below 85%"
+    for item in ranked[:PRINTED_TOP_COUNT]:
+        badge = f"{item['match_percent']}% match" if item["show_badge"] else (
+            f"no badge, {item['match_percent']}% match, below {BADGE_DISPLAY_THRESHOLD_PERCENT}%"
+        )
         override_note = " [dislike override used]" if item["dislike_override_used"] else ""
         top_reason = item["reasons"][0]
         # Only show the average rating for users who set a quality floor,
@@ -227,9 +231,9 @@ def print_results(user, ranked):
 
     disliked = set(user.get("disliked_genres", []))
     if disliked:
-        flagged = [item["title"] for item in ranked[:15] if disliked.intersection(item["genres"])]
+        flagged = [item["title"] for item in ranked[:PRINTED_TOP_COUNT] if disliked.intersection(item["genres"])]
         flagged_note = f", {', '.join(flagged)}" if flagged else ""
-        print(f"  dislike check: {len(flagged)} of the top 15 carry a disliked genre{flagged_note}")
+        print(f"  dislike check: {len(flagged)} of the top {PRINTED_TOP_COUNT} carry a disliked genre{flagged_note}")
 
     # Show the full score breakdown for the single top pick, this is the
     # number that explains itself when you are showing this project to
@@ -289,7 +293,7 @@ def run_persona_result(result, label, catalog, context, options):
 
     print(f"\n=== Recommendations for {user['name']} ===")
     print(f"Taste: {user['taste_summary']}")
-    print(f"Showing {len(shown)} of {len(rows)} ranked titles (badge: match 85 percent or above)")
+    print(f"Showing {len(shown)} of {len(rows)} ranked titles (badge: match {BADGE_DISPLAY_THRESHOLD_PERCENT} percent or above)")
     print("\n".join(format_result_table(shown)))
 
     warnings = list(result.warnings)
