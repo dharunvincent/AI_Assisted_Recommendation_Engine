@@ -219,3 +219,12 @@ MIN_IMDB_VOTES_FOR_FLOOR = 1000
 # -----------------------------------------------------------------------
 TASTE_BIAS_PER_PREFERRED_PERSON = 0.08
 TASTE_BIAS_PEOPLE_CAP = 0.16
+
+# -----------------------------------------------------------------------
+# PERSONA FILE RESULTS
+# How many titles the printed list shows, and how short the final list can
+# get before the filter report names the strictest filter (so the user knows
+# which preference to relax). The saved CSV always has the full ranked list.
+# -----------------------------------------------------------------------
+PRINTED_RESULT_COUNT = 15
+SHORT_LIST_WARNING_BELOW = 15

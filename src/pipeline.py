@@ -22,14 +22,20 @@ Or for your own taste file:  python -m src.pipeline --persona-file personas/exam
 
 import argparse
 import sys
-from datetime import datetime
+from datetime import date, datetime
 
 from src.catalog import load_catalog
+from src.results_report import (
+    build_result_rows,
+    format_filter_report,
+    format_result_lines,
+    write_results_csv,
+)
 from src.run_warnings import count_missing_movie_data, format_warning_section
 from src.user_profile.persona_loader import load_persona_file
 from src.user_profile.synthetic_users import build_all_personas
 from src.user_profile.taste_score import update_dislike_score, decay_to
-from src.exclusion_filter.exclude import exclude
+from src.exclusion_filter.exclude import apply_hard_filters
 from src.stage2_jev_ranking.rank import rank_candidates
 
 from src.stage1_candidate_generation import (
@@ -181,11 +187,18 @@ def run_pipeline_stages(user, catalog, context, as_of=None, similarity_table=Non
     """
     generator_results = run_generators(user, catalog, context, similarity_table)
     merged = merge(list(generator_results.values()))
-    cleaned = exclude(merged, user, catalog)
-    shortlist = trim_shortlist(cleaned)
+    outcome = apply_hard_filters(merged, user, catalog)
+    shortlist = trim_shortlist(outcome.kept)
     dislike_scores = build_dislike_scores(user, catalog, as_of)
     ranked = rank_candidates(user, catalog, shortlist, context, dislike_scores)
-    return {"generator_results": generator_results, "shortlist": shortlist, "ranked": ranked}
+    return {
+        "generator_results": generator_results,
+        "shortlist": shortlist,
+        "ranked": ranked,
+        # What each hard filter removed, for the filter report of a persona file run.
+        "filter_counts": outcome.removed_counts,
+        "candidate_count": len(merged),
+    }
 
 
 def run_pipeline_for_user(user, catalog, context):
@@ -263,9 +276,27 @@ def run_persona_file(path, catalog, context):
             print(f"- {error}")
         return 1
 
-    ranked = run_pipeline_for_user(result.user, catalog, context)
-    print_results(result.user, ranked)
-    print_warning_section(result.user, catalog, result.warnings)
+    user = result.user
+    stages = run_pipeline_stages(user, catalog, context)
+    warn_if_shortlist_too_small(user, stages["shortlist"])
+    rows = build_result_rows(stages["ranked"], catalog)
+
+    print(f"\n=== Recommendations for {user['name']} ===")
+    print(f"Taste: {user['taste_summary']}")
+    print("\n".join(format_result_lines(rows)))
+
+    warnings = list(result.warnings)
+    try:
+        path = write_results_csv(rows, user["name"], date.today())
+        print(f"\nFull ranked list ({len(rows)} titles) saved to {path}")
+    except OSError as error:
+        # The list is already on screen, so a failed save is a warning, not a stop.
+        warnings.append(f"Could not save the results file: {error}")
+
+    print("\n" + "\n".join(format_filter_report(
+        stages["filter_counts"], stages["candidate_count"], len(rows)
+    )))
+    print_warning_section(user, catalog, warnings)
     return 0
 
 
