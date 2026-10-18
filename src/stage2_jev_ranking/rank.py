@@ -80,6 +80,7 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
         # below, and ONLY there. Nowhere else in stage 2 subtracts it, so it
         # can never be counted twice.
         taste_fit_score = jev_answers["taste_fit"]["answer"]
+        taste_fit_before_penalty = taste_fit_score
 
         # Dislike override logic, if JEV's override question comes back
         # as override_show_anyway with reasonable confidence, we soften
@@ -125,6 +126,17 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
             "show_badge": final_score >= BADGE_DISPLAY_THRESHOLD_PERCENT,
             "dislike_override_used": override_used,
             "jev_answers": jev_answers,
+            # Read only numbers for src/evaluate.py --diagnose. Nothing in
+            # the ranking reads them.
+            "diagnostics": {
+                "genre_overlap_count": genre_overlap_count,
+                "dislike_penalty": dislike_penalty,
+                "taste_fit_before_penalty": taste_fit_before_penalty,
+                "taste_fit_after_penalty": taste_fit_score,
+                "taste_bias_before_cap": scoring_questions.taste_bias(
+                    genre_overlap_count, len(preferred_people)
+                ),
+            },
         })
 
     ranked.sort(key=lambda item: item["final_score"], reverse=True)
