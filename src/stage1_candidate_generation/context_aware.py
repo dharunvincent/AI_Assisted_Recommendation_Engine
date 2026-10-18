@@ -17,6 +17,8 @@ left out of this project, it was flagged during planning as extra scope
 not needed to prove the architecture works.
 """
 
+from config.weights import MIN_RATINGS_FOR_CONTENT_BASED
+
 CONTEXT_GENRE_RULES = {
     "weekday_daytime": ["Comedy", "Animation", "Documentary"],
     "weekday_evening": ["Drama", "Thriller", "Crime", "Action"],
@@ -26,8 +28,11 @@ CONTEXT_GENRE_RULES = {
 
 
 def _context_bucket(context):
-    is_weekend = context.get("day_of_week") in ("Saturday", "Sunday")
+    day = context.get("day_of_week")
     is_evening = context.get("time_of_day") == "evening"
+    # Friday evening already feels like the weekend, so it uses the weekend
+    # evening genres. Friday daytime is still a working day.
+    is_weekend = day in ("Saturday", "Sunday") or (day == "Friday" and is_evening)
     weekend_part = "weekend" if is_weekend else "weekday"
     time_part = "evening" if is_evening else "daytime"
     return f"{weekend_part}_{time_part}"
@@ -41,15 +46,22 @@ def generate(user, catalog, context, max_candidates=15):
     if not preferred_genres:
         return []
 
-    candidates = []
-    for movie in catalog.values():
-        if movie["movie_id"] in watched_ids:
-            continue
-        if set(preferred_genres).intersection(movie["genres"]):
-            candidates.append({
-                "movie_id": movie["movie_id"],
-                "source": "context_aware",
-                "reason": f"fits a {bucket.replace('_', ' ')} viewing moment",
-            })
+    # Without a rating floor and a sort, this took the first matching titles
+    # in catalog file order, which is how random 1995 films filled the list.
+    # Now the best known titles come first, the higher average winning ties.
+    matching = [
+        movie for movie in catalog.values()
+        if movie["movie_id"] not in watched_ids
+        and movie["rating_count"] >= MIN_RATINGS_FOR_CONTENT_BASED
+        and set(preferred_genres).intersection(movie["genres"])
+    ]
+    matching.sort(key=lambda movie: (movie["rating_count"], movie["avg_rating"]), reverse=True)
 
-    return candidates[:max_candidates]
+    return [
+        {
+            "movie_id": movie["movie_id"],
+            "source": "context_aware",
+            "reason": f"fits a {bucket.replace('_', ' ')} viewing moment",
+        }
+        for movie in matching[:max_candidates]
+    ]

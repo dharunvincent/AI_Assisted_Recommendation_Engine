@@ -10,8 +10,11 @@ Run with:  python3 -m unittest tests.test_generators
 
 import unittest
 
-from config.weights import MIN_RATINGS_FOR_CONTENT_BASED, LIKED_COMPLETION_THRESHOLD
-from src.stage1_candidate_generation import content_based
+from config.weights import (
+    MIN_RATINGS_FOR_CONTENT_BASED, LIKED_COMPLETION_THRESHOLD,
+    DIVERSITY_MIN_AVG_RATING, DIVERSITY_MIN_RATINGS,
+)
+from src.stage1_candidate_generation import content_based, context_aware, diversity
 
 ENOUGH = MIN_RATINGS_FOR_CONTENT_BASED
 
@@ -71,6 +74,50 @@ class TestContentBasedInferredGenres(unittest.TestCase):
     def test_the_list_is_cut_to_max_candidates_after_sorting(self):
         titles = [movie(10 + n, ["Action"], rating_count=ENOUGH + n) for n in range(5)]
         self.assertEqual(self.ids(*titles, max_candidates=2), [14, 13])
+
+
+class TestDiversity(unittest.TestCase):
+    def offered_ids(self, *others):
+        catalog = catalog_of(movie(1, ["Action"]), *others)
+        found = diversity.generate(user_with_history(1), catalog, max_candidates=50, random_seed=1)
+        return {c["movie_id"] for c in found}
+
+    def test_a_well_rated_title_with_too_few_ratings_is_never_offered(self):
+        lucky = movie(2, ["Horror"], rating_count=DIVERSITY_MIN_RATINGS - 1, avg_rating=5.0)
+        solid = movie(3, ["Horror"], rating_count=DIVERSITY_MIN_RATINGS, avg_rating=DIVERSITY_MIN_AVG_RATING)
+        self.assertEqual(self.offered_ids(lucky, solid), {3})
+
+    def test_the_other_rules_still_hold(self):
+        seen_genre = movie(2, ["Action"], avg_rating=4.5)
+        low_average = movie(3, ["Horror"], avg_rating=DIVERSITY_MIN_AVG_RATING - 0.1)
+        self.assertEqual(self.offered_ids(seen_genre, low_average), set())
+
+
+class TestContextAware(unittest.TestCase):
+    def ids(self, context, *titles, max_candidates=15):
+        found = context_aware.generate(user_with_history(1), catalog_of(movie(1, ["Mystery"]), *titles),
+                                       context, max_candidates)
+        return [c["movie_id"] for c in found]
+
+    def test_obscure_titles_are_dropped_and_known_ones_come_first(self):
+        saturday = {"day_of_week": "Saturday", "time_of_day": "daytime"}
+        obscure_first = movie(2, ["Comedy"], rating_count=ENOUGH - 1)
+        small = movie(3, ["Comedy"], rating_count=ENOUGH)
+        big_low = movie(4, ["Family"], rating_count=500, avg_rating=3.0)
+        big_high = movie(5, ["Family"], rating_count=500, avg_rating=4.5)
+        self.assertEqual(self.ids(saturday, obscure_first, small, big_low, big_high), [5, 4, 3])
+
+    def test_friday_evening_uses_the_weekend_evening_genres(self):
+        action = movie(2, ["Sci-Fi"])
+        drama = movie(3, ["Drama"])  # a weekday evening genre only
+        self.assertEqual(self.ids({"day_of_week": "Friday", "time_of_day": "evening"}, action, drama), [2])
+
+    def test_friday_daytime_and_thursday_evening_stay_weekdays(self):
+        action = movie(2, ["Sci-Fi"])
+        drama = movie(3, ["Drama"])
+        self.assertEqual(self.ids({"day_of_week": "Thursday", "time_of_day": "evening"}, action, drama), [3])
+        comedy = movie(4, ["Comedy"])
+        self.assertEqual(self.ids({"day_of_week": "Friday", "time_of_day": "daytime"}, action, comedy), [4])
 
 
 if __name__ == "__main__":
