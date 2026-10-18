@@ -588,6 +588,10 @@ A code review found the problems below, and each was fixed:
 
 - **The scoring is mocked.** JEV is a mock, so every match percentage
   is simulated, not measured.
+- **Mock noise can outweigh small boosts.** The mock scorer's noise (up
+  to about 7 points) can be bigger than a small boost such as a preferred
+  director, so exact ranks between close titles are not meaningful until a
+  real scorer replaces the mock.
 - **No IMDb scores.** MovieLens has no IMDb ratings. The Dharun persona
   uses a MovieLens average of 3.0 out of 5 as a stand in for IMDb 6 out
   of 10. Titles with fewer than 20 ratings are removed by this rule,

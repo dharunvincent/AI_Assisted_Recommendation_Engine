@@ -212,13 +212,15 @@ MIN_IMDB_VOTES_FOR_FLOOR = 1000
 
 # -----------------------------------------------------------------------
 # PREFERRED DIRECTORS AND CAST: TASTE BIAS
-# Every preferred director or actor found in a title raises the expected
-# taste fit (see TASTE_BIAS_BASE above) by this much, up to a cap. The cap
-# stops a title with three favourite actors from beating everything on cast
-# alone: genre match and the other questions should still matter.
+# The rule: a preferred person the user named counts the same as one shared
+# liked genre (TASTE_BIAS_PER_GENRE_OVERLAP above, 0.12). Naming "Michael Mann"
+# is at least as strong a statement of taste as liking "Crime", so the step is
+# the same. The cap is two such steps (0.24), the same as a title that shares
+# two liked genres: it stops a title with three favourite actors from beating
+# everything on cast alone, genre match and the other questions still matter.
 # -----------------------------------------------------------------------
-TASTE_BIAS_PER_PREFERRED_PERSON = 0.08
-TASTE_BIAS_PEOPLE_CAP = 0.16
+TASTE_BIAS_PER_PREFERRED_PERSON = 0.12
+TASTE_BIAS_PEOPLE_CAP = 0.24
 
 # -----------------------------------------------------------------------
 # PERSONA FILE RESULTS
@@ -228,3 +230,13 @@ TASTE_BIAS_PEOPLE_CAP = 0.16
 # -----------------------------------------------------------------------
 PRINTED_RESULT_COUNT = 15
 SHORT_LIST_WARNING_BELOW = 15
+
+# -----------------------------------------------------------------------
+# PEOPLE GENERATOR: SLOTS PER PREFERRED PERSON
+# Each preferred director or actor gets up to this many candidate titles,
+# and the generator takes turns between them. With one shared cap, the most
+# voted person took every slot (three Nolan blockbusters pushed out all of
+# Michael Mann's films). A title that matches two preferred people is listed
+# once and counts towards both of them.
+# -----------------------------------------------------------------------
+PEOPLE_CANDIDATES_PER_PERSON = 5

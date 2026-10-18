@@ -138,6 +138,16 @@ def _active_rules(user: Dict[str, Any]) -> List[Tuple[str, Rule]]:
     return rules
 
 
+def build_removal_check(user: Dict[str, Any]) -> Callable[[int, Movie], bool]:
+    """
+    Returns a function that says whether ANY active rule would remove a title
+    for this user. Lets a generator skip titles that are doomed anyway, using
+    these very rules instead of its own copy of them.
+    """
+    rules = _active_rules(user)
+    return lambda movie_id, movie: any(removes(movie_id, movie) for _, removes in rules)
+
+
 def apply_hard_filters(
     shortlist: List[Dict[str, Any]], user: Dict[str, Any], catalog: Dict[int, Dict[str, Any]]
 ) -> FilterOutcome:

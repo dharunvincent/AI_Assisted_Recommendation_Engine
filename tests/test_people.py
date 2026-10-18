@@ -7,6 +7,7 @@ shortlist maximum with nine generators. Tiny hand made data.
 
 import unittest
 from config.weights import (
+    PEOPLE_CANDIDATES_PER_PERSON,
     STAGE1_SHORTLIST_MAX_SIZE,
     TASTE_BIAS_BASE,
     TASTE_BIAS_PEOPLE_CAP,
@@ -68,6 +69,69 @@ class PeopleGeneratorTests(unittest.TestCase):
 
     def test_gives_nothing_without_preferred_people(self):
         self.assertEqual(people_based.generate(user(), CATALOG), [])
+
+
+def catalog_of(*movies):
+    return {m["movie_id"]: m for m in movies}
+
+
+def dated(movie_id, year, **kwargs):
+    entry = movie(movie_id, **kwargs)
+    entry["year"] = year
+    return entry
+
+
+class HardRulesBeforeSlotsTests(unittest.TestCase):
+    def test_titles_the_filters_would_remove_do_not_take_slots(self):
+        # Five famous Mann films from the 1980s, then two lesser ones in range.
+        old = [dated(n, 1985, directors=["Michael Mann"], votes=900000 + n) for n in range(1, 6)]
+        new = [dated(10, 1995, directors=["Michael Mann"], votes=100),
+               dated(11, 1999, directors=["Michael Mann"], votes=50)]
+        persona = user(preferred_directors=["Michael Mann"], year_from=1990, year_to=2018)
+        found = people_based.generate(persona, catalog_of(*old, *new))
+        self.assertEqual([c["movie_id"] for c in found], [10, 11])
+
+    def test_avoided_people_and_low_ratings_are_skipped_too(self):
+        movies = [
+            movie(1, directors=["Michael Mann"], cast=["Nic Cage"], votes=5000),
+            movie(2, directors=["Michael Mann"], votes=4000),
+            dated(3, 1995, directors=["Michael Mann"], votes=3000),
+        ]
+        movies[2]["imdb_rating"] = 5.0
+        persona = user(preferred_directors=["Michael Mann"], avoided_cast=["Nic Cage"],
+                       min_imdb_rating=7.0)
+        found = people_based.generate(persona, catalog_of(*movies))
+        self.assertEqual([c["movie_id"] for c in found], [2])
+
+
+class TakingTurnsTests(unittest.TestCase):
+    def test_every_person_gets_a_share_and_none_goes_over_it(self):
+        many = [movie(n, directors=["Christopher Nolan"], votes=1000000 - n) for n in range(1, 11)]
+        few = [movie(20, directors=["Michael Mann"], votes=10),
+               movie(21, directors=["Michael Mann"], votes=5)]
+        persona = user(preferred_directors=["Christopher Nolan", "Michael Mann"])
+        found = [c["movie_id"] for c in people_based.generate(persona, catalog_of(*many, *few))]
+        nolan = [i for i in found if i < 20]
+        self.assertEqual(len(nolan), PEOPLE_CANDIDATES_PER_PERSON)
+        self.assertEqual(sorted(i for i in found if i >= 20), [20, 21])
+        # They alternate, so Mann's best is second, not last.
+        self.assertEqual(found[:3], [1, 20, 2])
+
+    def test_a_title_with_two_preferred_people_is_listed_once_and_credited_to_both(self):
+        both = movie(1, cast=["Robert De Niro", "Al Pacino"], votes=9000)
+        de_niro = [movie(n, cast=["Robert De Niro"], votes=8000 - n) for n in range(10, 20)]
+        pacino = [movie(n, cast=["Al Pacino"], votes=7000 - n) for n in range(30, 40)]
+        persona = user(preferred_cast=["Robert De Niro", "Al Pacino"])
+        catalog = catalog_of(both, *de_niro, *pacino)
+        found = [c["movie_id"] for c in people_based.generate(persona, catalog)]
+        self.assertEqual(found.count(1), 1)
+        self.assertEqual(len(found), 1 + 2 * (PEOPLE_CANDIDATES_PER_PERSON - 1))
+        self.assertEqual(len([i for i in found if 10 <= i < 20]), PEOPLE_CANDIDATES_PER_PERSON - 1)
+
+    def test_a_person_with_no_usable_titles_does_not_stop_the_others(self):
+        persona = user(preferred_directors=["Nobody Known", "Michael Mann"])
+        found = people_based.generate(persona, catalog_of(movie(1, directors=["Michael Mann"])))
+        self.assertEqual([c["movie_id"] for c in found], [1])
 
 
 class TasteBoostTests(unittest.TestCase):
