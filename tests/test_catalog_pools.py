@@ -10,8 +10,8 @@ Run with:  python3 -m unittest tests.test_catalog_pools
 
 import unittest
 
-from config.weights import MIN_RATINGS_TO_TRUST
-from src.catalog_pools import is_trusted, trusted_titles
+from config.weights import MIN_RATINGS_TO_TRUST, RATING_SHRINKAGE_STRENGTH
+from src.catalog_pools import NEUTRAL_RATING, catalog_mean_rating, is_trusted, shrunk_rating, trusted_titles
 from src.stage1_candidate_generation import (
     collaborative, content_based, context_aware, demographic, diversity, session_based, trending,
 )
@@ -50,6 +50,45 @@ class TestTrustedTitles(unittest.TestCase):
 
     def test_empty_catalog_gives_an_empty_list(self):
         self.assertEqual(trusted_titles({}), [])
+
+
+class TestShrunkRating(unittest.TestCase):
+    PRIOR = 3.5
+
+    def test_no_raters_gives_the_prior(self):
+        self.assertEqual(shrunk_rating(5.0, 0, self.PRIOR), self.PRIOR)
+
+    def test_missing_average_gives_the_prior(self):
+        self.assertEqual(shrunk_rating(None, 100, self.PRIOR), self.PRIOR)
+
+    def test_a_huge_crowd_gives_almost_its_own_average(self):
+        self.assertAlmostEqual(shrunk_rating(4.4, 10_000_000, self.PRIOR), 4.4, places=4)
+
+    def test_one_perfect_rating_stays_near_the_middle(self):
+        self.assertLess(shrunk_rating(5.0, 1, self.PRIOR), 3.8)
+
+    def test_half_way_at_the_shrinkage_strength(self):
+        self.assertAlmostEqual(shrunk_rating(4.5, RATING_SHRINKAGE_STRENGTH, 3.5), 4.0)
+
+    def test_always_between_the_prior_and_the_own_average_and_closer_with_more_raters(self):
+        # Rules: stays between the two, and each extra rater can only move it toward the own average.
+        for own in (1.0, 2.5, 3.5, 4.4, 5.0):
+            previous_gap = abs(own - self.PRIOR)
+            for count in (1, 2, 5, 20, 100, 1000):
+                result = shrunk_rating(own, count, self.PRIOR)
+                low, high = sorted((own, self.PRIOR))
+                self.assertTrue(low - 1e-9 <= result <= high + 1e-9)
+                gap = abs(own - result)
+                self.assertLessEqual(gap, previous_gap + 1e-9)
+                previous_gap = gap
+
+    def test_prior_is_the_rating_weighted_catalog_average(self):
+        catalog = {1: movie(1, 100, 4.0), 2: movie(2, 300, 2.0)}
+        self.assertAlmostEqual(catalog_mean_rating(catalog), 2.5)
+
+    def test_prior_without_any_ratings_is_the_neutral_rating(self):
+        self.assertEqual(catalog_mean_rating({}), NEUTRAL_RATING)
+        self.assertEqual(catalog_mean_rating({1: movie(1, 0, None)}), NEUTRAL_RATING)
 
 
 class TestNoGeneratorPicksAThinlyRatedTitle(unittest.TestCase):

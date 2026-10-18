@@ -19,6 +19,7 @@ architecture, not a measured result from a real trained model.
 """
 
 from src.stage2_jev_ranking import jev_client, scoring_questions
+from src.catalog_pools import catalog_mean_rating
 from src.stage1_candidate_generation.business_rules import business_weight_for_user
 from src.user_profile.people_match import matched_preferred_people
 from config.weights import (
@@ -71,6 +72,9 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
     transparency, sorted by final_score, highest first.
     """
     ranked = []
+    # The catalog wide average that thinly rated titles are pulled toward,
+    # worked out once per run (see shrunk_rating in src/catalog_pools.py).
+    prior_rating = catalog_mean_rating(catalog)
 
     for candidate in shortlist:
         movie = catalog[candidate["movie_id"]]
@@ -88,7 +92,8 @@ def rank_candidates(user, catalog, shortlist, context, dislike_scores):
             user, movie, candidate, context, dislike_penalty, preferred_people
         )
         questions = scoring_questions.build_questions(
-            movie, candidate, context, dislike_penalty, genre_overlap_count, len(preferred_people)
+            movie, candidate, context, dislike_penalty, genre_overlap_count, len(preferred_people),
+            prior_rating,
         )
         jev_answers = jev_client.ask(state, questions)
 

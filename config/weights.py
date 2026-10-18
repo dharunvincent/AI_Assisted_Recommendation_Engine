@@ -166,6 +166,17 @@ OVERRIDE_PENALTY_RETAINED = 0.25
 # with things the user liked.
 TASTE_BIAS_BASE = 0.5
 TASTE_BIAS_PER_GENRE_OVERLAP = 0.12
+# Completion bias comes from the title's average rating, but an average from a
+# few raters is shaky: one perfect 5.0 used to give a perfect completion
+# bias. The average is pulled toward the catalog wide average first, as if
+# this many extra raters had given exactly the catalog average:
+#   shrunk = (count x average + STRENGTH x catalog average) / (count + STRENGTH)
+# With 20, a title with 20 raters sits half way between its own average and
+# the catalog's, one with 200 raters is 91 percent its own, one with a single
+# rater is almost the catalog average. It is the same number as
+# MIN_RATINGS_TO_TRUST on purpose: where we stop picking a title is where we
+# start to half believe it.
+RATING_SHRINKAGE_STRENGTH = 20
 # Expected context fit: higher when the title's own genres fit the current
 # context bucket (see CONTEXT_GENRE_RULES in context_aware.py). It used to
 # depend on which generator happened to find the title, which handed about
