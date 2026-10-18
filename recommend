@@ -1,0 +1,4 @@
+#!/bin/bash
+# One word launcher: always runs from the project folder, wherever it is called from.
+cd "$(dirname "$0")" || { echo "Cannot find the project folder."; exit 1; }
+exec python3 -m src.launcher "$@"

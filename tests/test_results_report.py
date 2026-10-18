@@ -15,7 +15,9 @@ from src.results_report import (
     CSV_COLUMNS,
     build_result_rows,
     format_filter_report,
-    format_result_lines,
+    DisplayOptions,
+    format_result_table,
+    select_rows,
     results_file_name,
     write_results_csv,
 )
@@ -47,18 +49,45 @@ class RowsAndPrintTests(unittest.TestCase):
         self.assertEqual(rows[0]["all_reasons"], "directed by Michael Mann | trending now")
         self.assertEqual((rows[0]["rank"], rows[1]["rank"]), (1, 2))
 
-    def test_movie_with_no_imdb_data_prints_n_a_and_does_not_crash(self):
-        lines = format_result_lines(build_result_rows(RANKED, CATALOG))
-        self.assertIn("IMDb 8.5", lines[0])
-        self.assertIn("(badge)", lines[0])
-        self.assertIn("IMDb n/a | dir. n/a | cast n/a", lines[1])
-        self.assertIn("(no badge)", lines[1])
+    def test_table_has_every_column_and_handles_missing_imdb(self):
+        lines = format_result_table(build_result_rows(RANKED, CATALOG))
+        self.assertEqual(len(lines), 3)  # header + 2 rows
+        for column in ["Rank", "Title", "Year", "IMDb", "Match", "Badge", "Main reason"]:
+            self.assertIn(column, lines[0])
+        self.assertIn("8.5", lines[1])
+        self.assertIn("80%", lines[1])
+        self.assertIn("✓", lines[1])
+        self.assertIn("n/a", lines[2])
+        self.assertNotIn("✓", lines[2])
 
-    def test_printed_list_is_limited_but_rows_are_complete(self):
+    def test_table_lists_every_row_not_just_fifteen(self):
         many = [ranked_item(2, 50.0, False, ["x"]) for _ in range(40)]
-        rows = build_result_rows(many, CATALOG)
-        self.assertEqual(len(rows), 40)
-        self.assertEqual(len(format_result_lines(rows)), 15)
+        self.assertEqual(len(format_result_table(build_result_rows(many, CATALOG))), 41)
+
+
+class SelectRowsTests(unittest.TestCase):
+    def rows(self):
+        items = [ranked_item(1, s, s >= 72, ["x"]) for s in (90, 80, 75, 60, 50)]
+        return build_result_rows(items, CATALOG)
+
+    def test_default_shows_everything(self):
+        self.assertEqual(len(select_rows(self.rows(), DisplayOptions())), 5)
+
+    def test_badged_only_keeps_only_badged_rows_with_their_rank(self):
+        shown = select_rows(self.rows(), DisplayOptions(badged_only=True))
+        self.assertEqual([row["rank"] for row in shown], [1, 2, 3])
+
+    def test_top_limits_the_list(self):
+        self.assertEqual(len(select_rows(self.rows(), DisplayOptions(top=2))), 2)
+
+    def test_top_is_applied_after_badged_only(self):
+        shown = select_rows(self.rows(), DisplayOptions(badged_only=True, top=2))
+        self.assertEqual([row["rank"] for row in shown], [1, 2])
+
+    def test_selecting_never_changes_the_full_list(self):
+        rows = self.rows()
+        select_rows(rows, DisplayOptions(badged_only=True, top=1))
+        self.assertEqual(len(rows), 5)
 
 
 class FilterReportTests(unittest.TestCase):

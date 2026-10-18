@@ -12,3 +12,7 @@ data/imdb_enriched.csv
 data/imdb_enriched.csv.tmp
 # Personal results files
 results/
+
+# Personal persona files (interactive mode writes here), only the example is shared
+personas/*.json
+!personas/example.json

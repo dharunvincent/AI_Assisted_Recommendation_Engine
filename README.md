@@ -325,31 +325,47 @@ AI_Assisted_Recommendation_Engine/
     └── test_results_report.py     Tests for the printed list, the CSV and the filter report
 ```
 
-## How to run this project
+## Run it in one word
 
-1. Install Python 3.9 or newer.
-2. From inside the `AI_Assisted_Recommendation_Engine` folder, download
-   the real movie data:
-   ```
-   python data/download_movielens.py
-   ```
-3. Run the full pipeline:
-   ```
-   python -m src.pipeline
-   ```
-   This prints a ranked, scored recommendation list for each of the
-   four synthetic personas. To run just one, add `--persona` and a
-   first name, for example `python -m src.pipeline --persona dharun`.
-4. Optional, run all the tests:
-   ```
-   python -m unittest discover tests
-   ```
-5. Optional, run the offline evaluation (see the Evaluation section):
-   ```
-   python -m src.evaluate
-   ```
+```
+recommend
+```
 
-No API keys and no paid services are needed to run this project.
+That is all. Type it in any Terminal folder (it needs Python 3.9 or newer, and
+the one time setup below). It first asks:
+
+1. **Use a ready made persona** picks one of the four built in personas, or one
+   of your saved `personas/*.json` files, and goes straight to the results.
+2. **Enter your own preferences** asks one plain English question at a time.
+   Only the genres you like are required, press Enter to skip the rest. A
+   wrong answer is explained and asked again, and a name that is not found
+   offers a "did you mean" you accept with `y`.
+
+Then you see a short summary and type `go` (show recommendations), `redo`
+(start the questions over) or `quit` (exit, nothing saved). Press Ctrl+C at
+any time to stop, nothing is saved.
+
+The results are one table with every ranked movie: rank, title, year, IMDb
+rating, match %, a ✓ badge for 72 or above, and the main reason. Your answers
+are saved to `personas/<name>.json` and the results to `results/*.csv`,
+neither is committed to git.
+
+One time setup, from the project folder:
+
+```
+python3 data/download_movielens.py     # the movies
+python3 data/download_imdb.py          # ratings, directors, cast
+echo 'alias recommend="'"$PWD"'/recommend"' >> ~/.zshrc   # then open a new Terminal window
+```
+
+If a download is missing, `recommend` says which one and the exact command to
+fix it. Other commands:
+
+```
+python3 -m src.pipeline               # the four built in personas, plain output
+python3 -m src.evaluate               # offline evaluation (see Evaluation)
+python3 -m unittest discover tests    # all the tests
+```
 
 ## Run it with your own taste
 
@@ -364,8 +380,8 @@ from it. Steps:
 4. Run it: `python3 -m src.pipeline --persona-file personas/me.json`
 5. Open the CSV it saved in `results/` (the path is printed at the end).
 
-What you get: a readable top 15 (rank, title, year, IMDb rating, director,
-top cast, score, badge, reason), the full list in the CSV, a filter report
+What you get: the full ranked list as a table (rank, title, year, IMDb rating,
+match %, badge, reason), the full list in the CSV, a filter report
 saying how many titles each of your rules removed (and which one to relax
 if the list is short), and a short "Warnings" section.
 
@@ -394,7 +410,8 @@ For someone who does not code. Think of the engine as a funnel.
    genres and ratings. IMDb data (optional) adds a rating, directors and cast.
 2. **Know the person.** A persona is a description of someone's taste: what
    they like, dislike, and a few movies they love. Yours lives in a small
-   JSON file. If you give no favourite movies, a believable history is made
+   JSON file, which you can write by hand or let `--interactive` create by
+   asking you questions. If you give no favourite movies, a believable history is made
    from your liked genres, because the engine needs some history to learn from.
 3. **Find many candidates.** Nine small "finders" each suggest titles from a
    different angle (similar genres, what similar people watched, what is

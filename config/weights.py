@@ -224,11 +224,11 @@ TASTE_BIAS_PEOPLE_CAP = 0.24
 
 # -----------------------------------------------------------------------
 # PERSONA FILE RESULTS
-# How many titles the printed list shows, and how short the final list can
-# get before the filter report names the strictest filter (so the user knows
-# which preference to relax). The saved CSV always has the full ranked list.
+# How short the final list can get before the filter report names the
+# strictest filter (so the user knows which preference to relax). The printed
+# list and the saved CSV both have the full ranked list, unless the user asks
+# for fewer with --top or --badged-only.
 # -----------------------------------------------------------------------
-PRINTED_RESULT_COUNT = 15
 SHORT_LIST_WARNING_BELOW = 15
 
 # -----------------------------------------------------------------------
